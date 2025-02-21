@@ -1,0 +1,34 @@
+echo "# Node.js (React FrontEnd)
+FrontEnd/node_modules/
+FrontEnd/.env
+FrontEnd/dist/
+FrontEnd/build/
+FrontEnd/.DS_Store
+FrontEnd/.vscode/
+FrontEnd/npm-debug.log*
+FrontEnd/yarn-debug.log*
+FrontEnd/yarn-error.log*
+
+# Python (Flask BackEnd)
+BackEnd/venv/
+BackEnd/__pycache__/
+BackEnd/*.pyc
+BackEnd/*.pyo
+BackEnd/*.pyd
+BackEnd/.Python
+BackEnd/.env
+BackEnd/.DS_Store
+BackEnd/.vscode/
+BackEnd/logs/
+BackEnd/*.log
+BackEnd/instance/
+BackEnd/pip-log.txt
+BackEnd/pip-delete-this-directory.txt
+BackEnd/sqlite.db
+BackEnd/db.sqlite3
+
+
+# Global
+.DS_Store
+.vscode/
+*.log" > .gitignore
