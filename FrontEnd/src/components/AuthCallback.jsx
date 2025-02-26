@@ -10,6 +10,17 @@ function AuthCallback() {
   const location = useLocation();
 
   const processCallback = useCallback(async () => {
+    // 检查是否有错误参数
+    const urlParams = new URLSearchParams(location.search);
+    const error = urlParams.get("error");
+
+    if (error) {
+      console.error("认证错误:", error);
+      setError(error);
+      navigate("/login");
+      return;
+    }
+
     // 使用 sessionStorage 来防止重复处理
     const processedUrl = sessionStorage.getItem("processed_callback_url");
     if (processedUrl === location.search) {

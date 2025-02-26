@@ -88,24 +88,21 @@ def exchange_token():
         return jsonify({'error': 'Request must be in JSON format'}), 400
         
     code = request.json.get('code')
+    
     if not code:
         return jsonify({'error': 'Authorization code is required'}), 400
     
     try:
-        token_endpoint = f"{COGNITO_DOMAIN}/oauth2/token"
+        token_endpoint = f'{COGNITO_DOMAIN}/oauth2/token'
+        
+        # 添加客户端认证
+        auth = (COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
         
         payload = {
             'grant_type': 'authorization_code',
-            'client_id': COGNITO_CLIENT_ID,
-            'client_secret': COGNITO_CLIENT_SECRET,
             'code': code,
             'redirect_uri': COGNITO_REDIRECT_URI
         }
-        
-        # 添加详细日志
-        logger.info(f"Attempting token exchange with code: {code[:10]}...")
-        logger.info(f"Token endpoint: {token_endpoint}")
-        logger.info(f"Redirect URI: {COGNITO_REDIRECT_URI}")
         
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -114,27 +111,30 @@ def exchange_token():
         response = requests.post(
             token_endpoint,
             data=payload,
-            headers=headers
+            headers=headers,
+            auth=auth  # 使用基本认证
         )
         
+        # Print response info for debugging
+        logger.info(f"Token exchange response status: {response.status_code}")
+        logger.info(f"Token exchange response content: {response.text}")
+        
         if response.status_code != 200:
-            logger.error(f"Token exchange failed: {response.status_code}")
-            logger.error(f"Response body: {response.text}")
-            logger.error(f"Request payload: {payload}")
-            return jsonify({'error': 'Token exchange failed', 'details': response.text}), 400
+            logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
+            return jsonify({'error': f'Token exchange failed: {response.status_code} - {response.text}'}), 400
             
         tokens = response.json()
         
-        # Get user info using the same domain
-        userinfo_endpoint = f"{COGNITO_DOMAIN}/oauth2/userInfo"
+        # Get user info
+        userinfo_endpoint = f'{COGNITO_DOMAIN}/oauth2/userInfo'
         userinfo_response = requests.get(
             userinfo_endpoint,
             headers={'Authorization': f'Bearer {tokens["access_token"]}'}
         )
         
         if userinfo_response.status_code != 200:
-            logger.error(f"Failed to get user info: {userinfo_response.status_code} - {userinfo_response.text}")
-            return jsonify({'error': 'Failed to get user information'}), 400
+            logger.error(f"Failed to get user information: {userinfo_response.status_code} - {userinfo_response.text}")
+            return jsonify({'error': f'Failed to get user information: {userinfo_response.status_code} - {userinfo_response.text}'}), 400
             
         user_info = userinfo_response.json()
         
@@ -146,8 +146,10 @@ def exchange_token():
             'user': user_info
         })
     except Exception as e:
-        logger.error(f"Error processing authorization code: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        logger.error(f"Error processing authorization code: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': f'Error processing authorization code: {str(e)}'}), 500
 
 # Protected user profile route
 @app.route('/api/user/profile')
@@ -177,10 +179,7 @@ def update_user_profile(user):
 # Health check endpoint
 @app.route('/api/health')
 def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'version': '1.0.0'
-    })
+    return jsonify({'status': 'healthy'})
 
 # Login endpoint
 @app.route('/api/auth/login')
@@ -194,6 +193,29 @@ def initiate_login():
     }
     
     return redirect(f"{auth_url}?{urlencode(params)}")
+
+@app.route('/api/auth/logout')
+def logout():
+    """
+    Handle user logout by redirecting to Cognito logout endpoint
+    """
+    try:
+        # Build the logout URL
+        logout_url = f"{COGNITO_DOMAIN}/logout"
+        params = {
+            'client_id': COGNITO_CLIENT_ID,
+            'logout_uri': COGNITO_REDIRECT_URI  # Redirect back to frontend after logout
+        }
+        
+        # Log the logout URL for debugging
+        full_logout_url = f"{logout_url}?{urlencode(params)}"
+        logger.info(f"Redirecting to logout URL: {full_logout_url}")
+        
+        # Redirect to Cognito logout page
+        return redirect(full_logout_url)
+    except Exception as e:
+        logger.error(f"Error during logout: {str(e)}")
+        return jsonify({'error': f'Error during logout: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

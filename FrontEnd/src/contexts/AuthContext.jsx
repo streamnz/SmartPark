@@ -116,20 +116,26 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // 登出函数
+  // Logout function - directly use Cognito logout URL
   const logout = () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("user_data");
+    // 清除所有状态和存储
     setCurrentUser(null);
     setAccessToken(null);
+    setProcessingAuth(false);
 
-    // 重定向到Cognito登出端点
+    // 清除所有存储
+    localStorage.clear();
+    sessionStorage.clear(); // 添加这行，清除 session storage
+
+    // 构建登出 URL
     const logoutUrl =
-      `${cognitoConfig.authority}/logout?` +
-      `client_id=${cognitoConfig.clientId}&` +
-      `logout_uri=${encodeURIComponent(window.location.origin)}`;
+      `https://ap-southeast-2bxhdowudl.auth.ap-southeast-2.amazoncognito.com/logout?` +
+      `client_id=4r2ui82gb5gigfrfjl18tq1i6i&` +
+      `logout_uri=${encodeURIComponent("http://localhost:5173")}&` +
+      `response_type=token`; // 添加响应类型
 
-    window.location.href = logoutUrl;
+    // 重定向到登出页面
+    window.location.replace(logoutUrl); // 使用 replace 而不是 href
   };
 
   // 添加请求拦截器
