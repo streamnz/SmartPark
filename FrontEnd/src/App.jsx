@@ -1,5 +1,10 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import Login from "./components/Login";
 import AuthCallback from "./components/AuthCallback";
@@ -22,7 +27,7 @@ function App() {
               </PrivateRoute>
             }
           />
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<Navigate to="/login" />} />
         </Routes>
       </AuthProvider>
     </Router>

@@ -7,6 +7,9 @@ import requests
 import logging
 from dotenv import load_dotenv
 from urllib.parse import urlencode
+from utils.ai_service import get_ai_recommendation, reroute_recommendation
+from parking_data import parking_lots, get_auckland_destinations
+import random
 
 # 加载环境变量
 load_dotenv()
@@ -79,7 +82,11 @@ def token_required(f):
 # Root route
 @app.route('/')
 def index():
-    return jsonify({"message": "API service is running", "status": "ok"})
+    return jsonify({
+        "status": "success",
+        "message": "SmartPark Auckland API is running",
+        "version": "1.0.0"
+    })
 
 # Token exchange endpoint
 @app.route('/api/auth/token', methods=['POST'])
@@ -216,6 +223,253 @@ def logout():
     except Exception as e:
         logger.error(f"Error during logout: {str(e)}")
         return jsonify({'error': f'Error during logout: {str(e)}'}), 500
+
+@app.route('/api/vehicles', methods=['GET'])
+def get_vehicles():
+    """获取可用车辆类型"""
+    vehicles = [
+        {
+            "id": "sedan",
+            "name": "小轿车",
+            "description": "标准四门轿车，适合城市驾驶",
+            "image": "/models/thumbnails/sedan.jpg",
+            "width": 1.8,
+            "length": 4.5,
+            "height": 1.5,
+            "model_path": "/models/sedan.glb"
+        },
+        {
+            "id": "suv",
+            "name": "SUV",
+            "description": "运动型多用途车，提供更多空间和通过性",
+            "image": "/models/thumbnails/suv.jpg",
+            "width": 1.9,
+            "length": 4.7,
+            "height": 1.7,
+            "model_path": "/models/suv.glb"
+        },
+        {
+            "id": "pickup",
+            "name": "皮卡车",
+            "description": "带有开放式货箱的卡车",
+            "image": "/models/thumbnails/pickup.jpg",
+            "width": 2.0,
+            "length": 5.3,
+            "height": 1.9,
+            "model_path": "/models/pickup.glb"
+        },
+        {
+            "id": "van",
+            "name": "小货车",
+            "description": "封闭式箱型车，适合运输货物",
+            "image": "/models/thumbnails/van.jpg",
+            "width": 2.0,
+            "length": 5.5,
+            "height": 2.2,
+            "model_path": "/models/van.glb"
+        },
+        {
+            "id": "truck",
+            "name": "大货车",
+            "description": "大型运输车辆，空间充足",
+            "image": "/models/thumbnails/truck.jpg",
+            "width": 2.5,
+            "length": 7.0,
+            "height": 2.8,
+            "model_path": "/models/truck.glb"
+        },
+        {
+            "id": "rv",
+            "name": "房车",
+            "description": "可移动的居住空间，适合长途旅行",
+            "image": "/models/thumbnails/rv.jpg",
+            "width": 2.3,
+            "length": 6.8,
+            "height": 3.0,
+            "model_path": "/models/rv.glb"
+        }
+    ]
+    
+    return jsonify({"status": "success", "data": vehicles})
+
+@app.route('/api/destinations', methods=['GET'])
+def get_destinations():
+    """获取奥克兰热门目的地"""
+    destinations = get_auckland_destinations()
+    return jsonify({"status": "success", "data": destinations})
+
+@app.route('/api/parking-lots/nearby', methods=['GET'])
+def get_nearby_parking_lots():
+    """获取目的地附近的停车场"""
+    lat = float(request.args.get('lat', -36.8485))
+    lng = float(request.args.get('lng', 174.7630))
+    radius = float(request.args.get('radius', 1000))  # 默认1公里半径
+    
+    # 简单模拟：为每个请求的位置生成一个附近停车场
+    destination_name = request.args.get('name', '未知位置')
+    
+    # 生成一个随机但稳定的停车场ID (基于位置)
+    lot_id = f"parking_{int((lat+36)*1000)}_{int((lng-174)*1000)}"
+    
+    nearby_lot = {
+        "id": lot_id,
+        "name": f"{destination_name}停车场",
+        "location": {
+            "lat": lat + random.uniform(-0.001, 0.001),
+            "lng": lng + random.uniform(-0.001, 0.001)
+        },
+        "total_spots": random.randint(50, 300),
+        "available_spots": random.randint(10, 50),
+        "hourly_rate": round(random.uniform(2, 8), 1),
+        "distance_to_destination": int(random.uniform(50, 300)),
+        "features": random.sample(["covered", "security", "disabled_access", 
+                                   "ev_charging", "valet", "24h"], 
+                                 k=random.randint(2, 4))
+    }
+    
+    return jsonify({
+        "status": "success", 
+        "data": {"parkings": [nearby_lot]}
+    })
+
+@app.route('/api/parking-lot/<lot_id>', methods=['GET'])
+def get_parking_lot(lot_id):
+    """获取停车场详情和布局"""
+    if lot_id not in parking_lots:
+        # 如果还没有这个停车场，生成一个新的
+        rows = random.randint(6, 10)
+        cols = random.randint(8, 12)
+        
+        # 创建新停车场
+        parking_lot = {
+            "id": lot_id,
+            "name": f"停车场 {lot_id}",
+            "rows": rows,
+            "cols": cols,
+            "entrance": {"row": 0, "col": cols // 2},
+            "exit": {"row": rows - 1, "col": cols // 2},
+            "spots": {}
+        }
+        
+        # 生成车位
+        occupied_count = int(rows * cols * 0.7)  # 70%的车位已占用
+        for row in range(rows):
+            for col in range(cols):
+                # 跳过入口和出口位置
+                if ((row == 0 and col == cols // 2) or 
+                    (row == rows - 1 and col == cols // 2)):
+                    continue
+                
+                spot_id = f"spot_{row}_{col}"
+                is_occupied = occupied_count > 0
+                if is_occupied:
+                    occupied_count -= 1
+                
+                # 随机指定一些特殊车位类型
+                spot_type = "standard"
+                if random.random() < 0.1:
+                    spot_type = random.choice(["disabled", "ev_charging", "compact", "large"])
+                
+                parking_lot["spots"][spot_id] = {
+                    "id": spot_id,
+                    "row": row,
+                    "col": col,
+                    "type": spot_type,
+                    "is_occupied": is_occupied,
+                    "distance_to_entrance": abs(row) + abs(col - cols // 2),
+                    "distance_to_exit": abs(row - (rows - 1)) + abs(col - cols // 2)
+                }
+        
+        # 保存到内存中的停车场数据
+        parking_lots[lot_id] = parking_lot
+    
+    return jsonify({"status": "success", "data": parking_lots[lot_id]})
+
+@app.route('/api/allocate-spot', methods=['POST'])
+def allocate_spot():
+    """为车辆分配最佳停车位"""
+    data = request.json
+    lot_id = data.get('parking_id')
+    vehicle_info = data.get('vehicle_info', {})
+    destination = data.get('destination', {})
+    user_preferences = data.get('user_preferences', {})
+    
+    if lot_id not in parking_lots:
+        return jsonify({"status": "error", "message": "Parking lot not found"}), 404
+    
+    # 获取可用车位
+    available_spots = [
+        spot for spot_id, spot in parking_lots[lot_id]["spots"].items()
+        if not spot["is_occupied"]
+    ]
+    
+    if not available_spots:
+        return jsonify({"status": "error", "message": "No available spots"}), 400
+    
+    # 使用AI服务获取推荐
+    recommendation = get_ai_recommendation(
+        available_spots, 
+        vehicle_info, 
+        user_preferences, 
+        parking_lots[lot_id]
+    )
+    
+    # 标记车位为已占用
+    spot_id = recommendation["spot"]["id"]
+    parking_lots[lot_id]["spots"][spot_id]["is_occupied"] = True
+    
+    return jsonify({
+        "status": "success",
+        "data": recommendation
+    })
+
+@app.route('/api/reroute-spot', methods=['POST'])
+def reroute_spot():
+    """重新路由到新的停车位"""
+    data = request.json
+    lot_id = data.get('parking_id')
+    vehicle_info = data.get('vehicle_info', {})
+    current_position = data.get('current_position', [0, 0, 0])
+    destination = data.get('destination', {})
+    
+    if lot_id not in parking_lots:
+        return jsonify({"status": "error", "message": "Parking lot not found"}), 404
+    
+    # 获取可用车位
+    available_spots = [
+        spot for spot_id, spot in parking_lots[lot_id]["spots"].items()
+        if not spot["is_occupied"]
+    ]
+    
+    if not available_spots:
+        return jsonify({"status": "error", "message": "No available spots"}), 400
+    
+    # 使用AI服务获取新推荐
+    new_recommendation = reroute_recommendation(
+        available_spots, 
+        vehicle_info, 
+        current_position, 
+        destination,
+        parking_lots[lot_id]
+    )
+    
+    # 标记新车位为已占用
+    spot_id = new_recommendation["spot"]["id"]
+    parking_lots[lot_id]["spots"][spot_id]["is_occupied"] = True
+    
+    return jsonify({
+        "status": "success",
+        "data": new_recommendation
+    })
+
+@app.route('/api/reset-parking-lot/<lot_id>', methods=['POST'])
+def reset_parking_lot(lot_id):
+    """重置停车场（所有车位变为可用）"""
+    if lot_id in parking_lots:
+        for spot_id in parking_lots[lot_id]["spots"]:
+            parking_lots[lot_id]["spots"][spot_id]["is_occupied"] = False
+    
+    return jsonify({"status": "success", "message": f"Parking lot {lot_id} reset"})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

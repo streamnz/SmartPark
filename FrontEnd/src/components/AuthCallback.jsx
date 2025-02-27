@@ -12,45 +12,42 @@ function AuthCallback() {
   const processCallback = useCallback(async () => {
     // 检查是否有错误参数
     const urlParams = new URLSearchParams(location.search);
-    const error = urlParams.get("error");
+    const errorParam = urlParams.get("error");
 
-    if (error) {
-      console.error("认证错误:", error);
-      setError(error);
+    if (errorParam) {
+      console.error("认证错误:", errorParam);
+      setError(errorParam);
       navigate("/login");
       return;
     }
 
-    // 使用 sessionStorage 来防止重复处理
-    const processedUrl = sessionStorage.getItem("processed_callback_url");
-    if (processedUrl === location.search) {
-      console.log("Callback already processed");
+    const code = urlParams.get("code");
+    if (!code) {
+      setError("未找到授权码");
+      return;
+    }
+
+    // 使用 localStorage 来防止重复处理
+    // 注意：使用 localStorage 而不是 sessionStorage，确保与 AuthContext 一致
+    const processedCode = localStorage.getItem("processed_auth_code");
+    if (processedCode === code) {
+      console.log("此授权码已处理过，直接进入仪表板");
       navigate("/dashboard");
       return;
     }
 
     try {
       setLoading(true);
-      const urlParams = new URLSearchParams(location.search);
-      const code = urlParams.get("code");
-
-      if (!code) {
-        setError("Authorization code not found");
-        return;
-      }
-
-      console.log("Processing new authorization code...");
+      console.log("处理新授权码...");
       const success = await handleAuthCallback(code);
 
       if (success) {
-        // 存储已处理的URL
-        sessionStorage.setItem("processed_callback_url", location.search);
         navigate("/dashboard");
       } else {
-        setError("Authentication failed");
+        setError("认证失败");
       }
     } catch (err) {
-      console.error("Error:", err);
+      console.error("错误:", err);
       setError(err.message);
     } finally {
       setLoading(false);

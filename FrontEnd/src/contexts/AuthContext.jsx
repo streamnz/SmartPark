@@ -79,38 +79,54 @@ export function AuthProvider({ children }) {
 
   // Handle OAuth callback
   const handleAuthCallback = async (code) => {
-    if (processingAuth) {
-      console.log("Auth process already in progress");
+    // 使用全局变量存储正在处理的代码
+    const PROCESSING_KEY = "auth_code_processing";
+
+    // 检查是否已经处理过该代码
+    const processedCode = localStorage.getItem("processed_auth_code");
+    if (processedCode === code) {
+      console.log("此授权码已处理过，跳过");
+      return true; // 返回 true 避免导航问题
+    }
+
+    // 检查是否有正在处理的请求
+    if (localStorage.getItem(PROCESSING_KEY) === code) {
+      console.log("此授权码正在处理中，跳过");
       return false;
     }
 
     try {
+      // 标记为正在处理
+      localStorage.setItem(PROCESSING_KEY, code);
       setProcessingAuth(true);
       setLoading(true);
 
-      const processedCode = sessionStorage.getItem("processed_auth_code");
-      if (processedCode === code) {
-        console.log("Auth code already processed");
-        return false;
-      }
+      console.log("开始处理新授权码:", code);
 
       const response = await axios.post(
         "http://localhost:5001/api/auth/token",
         { code },
-        { headers: { "Content-Type": "application/json" } }
+        {
+          headers: { "Content-Type": "application/json" },
+          // 添加防止重复请求的标识
+          signal: AbortSignal.timeout(10000), // 10秒超时
+        }
       );
 
       if (response.data.access_token) {
         setCurrentUser(response.data.user);
         setAccessToken(response.data.access_token);
-        sessionStorage.setItem("processed_auth_code", code);
+        // 保存已处理的代码
+        localStorage.setItem("processed_auth_code", code);
         return true;
       }
       return false;
     } catch (error) {
-      console.error("Token exchange error:", error);
+      console.error("Token交换错误:", error);
       return false;
     } finally {
+      // 清除处理状态
+      localStorage.removeItem(PROCESSING_KEY);
       setProcessingAuth(false);
       setLoading(false);
     }
