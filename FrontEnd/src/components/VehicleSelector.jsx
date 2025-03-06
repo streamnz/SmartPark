@@ -1,15 +1,3 @@
-import React from "react";
-import {
-  Grid,
-  Card,
-  CardMedia,
-  CardContent,
-  Typography,
-  Button,
-  Box,
-  Chip,
-} from "@mui/material";
-import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import AirportShuttleIcon from "@mui/icons-material/AirportShuttle";
 

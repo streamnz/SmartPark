@@ -62,11 +62,11 @@ function Dashboard() {
             setSelectedVehicle(vehiclesData.data[0]);
           }
         } else {
-          setError("认证信息不完整");
+          setError("Authentication information incomplete");
         }
       } catch (err) {
-        console.error("加载初始数据时出错:", err);
-        setError("获取数据时出错");
+        console.error("Error loading initial data:", err);
+        setError("Error retrieving data");
       } finally {
         setLoading(false);
       }
@@ -106,7 +106,7 @@ function Dashboard() {
         setParkingSpots(details);
       })
       .catch((err) => {
-        console.error("获取停车场详情出错:", err);
+        console.error("Error fetching parking lot details:", err);
         setParkingSpots({
           recommended_spot: {
             id: "A12",
@@ -154,7 +154,7 @@ function Dashboard() {
       >
         <CircularProgress />
         <Typography variant="body1" sx={{ mt: 2 }}>
-          加载中...
+          Loading...
         </Typography>
       </Box>
     );
@@ -170,18 +170,18 @@ function Dashboard() {
           onClick={() => (window.location.href = "/login")}
           sx={{ mt: 2 }}
         >
-          需要重新登录
+          Login Required
         </Button>
       </Box>
     );
   }
 
   const steps = [
-    "选择目的地",
-    "确认路线",
-    "前往停车场",
-    "找到停车位",
-    "完成停车",
+    "Select Destination",
+    "Confirm Route",
+    "Navigate to Parking",
+    "Find Parking Spot",
+    "Parking Complete",
   ];
 
   return (
@@ -207,11 +207,11 @@ function Dashboard() {
             </IconButton>
           )}
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            智能停车系统
+            Smart Parking System
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <Typography variant="body2" sx={{ mr: 2 }}>
-              {currentUser?.email || "用户"}
+              {currentUser?.email || "User"}
             </Typography>
             <IconButton
               color="inherit"
@@ -264,7 +264,7 @@ function Dashboard() {
           <Box sx={{ p: 3, maxWidth: "800px", mx: "auto" }}>
             <Paper sx={{ p: 3, mb: 3, bgcolor: "#1e1e1e", color: "white" }}>
               <Typography variant="h5" gutterBottom>
-                确认您的目的地
+                Confirm Your Destination
               </Typography>
               <Divider sx={{ mb: 2, bgcolor: "rgba(255,255,255,0.1)" }} />
 
@@ -287,11 +287,11 @@ function Dashboard() {
                     {selectedDestination.address}
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 1, color: "#bbbbbb" }}>
-                    类别: {selectedDestination.category}
+                    Category: {selectedDestination.category}
                   </Typography>
 
                   <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                    选择您的车辆:
+                    Select Your Vehicle:
                   </Typography>
                   <Grid container spacing={1}>
                     {vehicles.map((vehicle) => (
@@ -354,7 +354,7 @@ function Dashboard() {
                 onClick={confirmDestination}
                 disabled={!selectedVehicle}
               >
-                确认并开始导航
+                Confirm and Start Navigation
               </Button>
             </Paper>
           </Box>
@@ -364,7 +364,7 @@ function Dashboard() {
           <Box sx={{ p: 3, maxWidth: "800px", mx: "auto" }}>
             <Paper sx={{ p: 3, mb: 3, bgcolor: "#1e1e1e", color: "white" }}>
               <Typography variant="h5" gutterBottom>
-                前往: {selectedDestination.name}
+                Navigate to: {selectedDestination.name}
               </Typography>
               <Divider sx={{ mb: 2, bgcolor: "rgba(255,255,255,0.1)" }} />
 
@@ -464,18 +464,18 @@ function Dashboard() {
               </Box>
 
               <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle1">导航信息</Typography>
+                <Typography variant="subtitle1">Navigation Info</Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  从: 奥克兰市中心
+                  From: Auckland City Center
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  到: {selectedDestination.name}
+                  To: {selectedDestination.name}
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  距离: {Math.floor(Math.random() * 5) + 2} 公里
+                  Distance: {Math.floor(Math.random() * 5) + 2} km
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  预计时间: {Math.floor(Math.random() * 15) + 5} 分钟
+                  Estimated Time: {Math.floor(Math.random() * 15) + 5} min
                 </Typography>
               </Box>
 
@@ -486,14 +486,14 @@ function Dashboard() {
                 onClick={() =>
                   handleArriveParking({
                     id: `parking_${selectedDestination.id}`,
-                    name: `${selectedDestination.name}停车场`,
+                    name: `${selectedDestination.name} Parking`,
                   })
                 }
                 disabled={navigationProgress < 100}
               >
                 {navigationProgress < 100
-                  ? `正在驾驶 (${navigationProgress}%)`
-                  : "已到达停车场"}
+                  ? `Driving (${navigationProgress}%)`
+                  : "Arrived at Parking Lot"}
               </Button>
             </Paper>
           </Box>
@@ -503,13 +503,13 @@ function Dashboard() {
           <Box sx={{ p: 3, maxWidth: "800px", mx: "auto" }}>
             <Paper sx={{ p: 3, mb: 3, bgcolor: "#1e1e1e", color: "white" }}>
               <Typography variant="h5" gutterBottom>
-                寻找停车位
+                Find Parking Spot
               </Typography>
               <Divider sx={{ mb: 2, bgcolor: "rgba(255,255,255,0.1)" }} />
 
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle1" gutterBottom>
-                  推荐停车位: {parkingSpots.recommended_spot?.id}
+                  Recommended Parking Spot: {parkingSpots.recommended_spot?.id}
                 </Typography>
 
                 <Box
@@ -563,39 +563,38 @@ function Dashboard() {
                 icon={<LocalParkingIcon fontSize="inherit" />}
                 sx={{ mb: 2, bgcolor: "#0a3d12", color: "white" }}
               >
-                系统已为您预留停车位 {parkingSpots.recommended_spot?.id}，位于{" "}
-                {selectedDestination.name}附近。
+                System has reserved parking spot{" "}
+                {parkingSpots.recommended_spot?.id} for you, located near{" "}
+                {selectedDestination.name}.
               </Alert>
 
               <Typography variant="subtitle2" gutterBottom>
-                导航指引:
+                Navigation Instructions:
               </Typography>
               <Box sx={{ mb: 2 }}>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • 进入停车场大门
+                  • Enter the parking garage
                 </Typography>
                 {parkingSpots.recommended_spot && (
                   <>
                     <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                      • 前往
+                      • Go to level{" "}
                       {Math.floor(
                         (parkingSpots.recommended_spot?.row || 0) / 2
                       ) + 1}
-                      层
                     </Typography>
                     <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                      • 沿
+                      • Drive along the{" "}
                       {(parkingSpots.recommended_spot?.row || 0) % 2 === 0
-                        ? "左"
-                        : "右"}
-                      侧行驶
+                        ? "left"
+                        : "right"}{" "}
+                      side
                     </Typography>
                     <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                      • 您的车位位于
+                      • Your spot is in section{" "}
                       {String.fromCharCode(
                         65 + (parkingSpots.recommended_spot?.row || 0)
                       )}
-                      区
                     </Typography>
                   </>
                 )}
@@ -607,7 +606,7 @@ function Dashboard() {
                 fullWidth
                 onClick={completeParking}
               >
-                已完成停车
+                Parking Complete
               </Button>
             </Paper>
           </Box>
@@ -621,7 +620,7 @@ function Dashboard() {
                   sx={{ fontSize: 80, color: "success.main", mb: 2 }}
                 />
                 <Typography variant="h5" gutterBottom>
-                  停车成功！
+                  Parking Successful!
                 </Typography>
               </Box>
 
@@ -629,24 +628,25 @@ function Dashboard() {
                 severity="info"
                 sx={{ mb: 3, bgcolor: "#0d3b54", color: "white" }}
               >
-                请记住您的停车位置: {parkingSpots.recommended_spot?.id}
+                Please remember your parking location:{" "}
+                {parkingSpots.recommended_spot?.id}
               </Alert>
 
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle1" gutterBottom>
-                  停车详情:
+                  Parking Details:
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • 停车场: {selectedDestination.name}停车场
+                  • Parking Facility: {selectedDestination.name} Parking
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • 停车位: {parkingSpots.recommended_spot?.id}
+                  • Parking Spot: {parkingSpots.recommended_spot?.id}
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • 计时开始: {new Date().toLocaleTimeString()}
+                  • Time Started: {new Date().toLocaleTimeString()}
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • 车辆: {selectedVehicle?.name}
+                  • Vehicle: {selectedVehicle?.name}
                 </Typography>
               </Box>
 
@@ -654,7 +654,8 @@ function Dashboard() {
                 severity="warning"
                 sx={{ mb: 3, bgcolor: "#614d03", color: "white" }}
               >
-                为方便您找回车辆，我们已将您的停车位置保存至您的历史记录。
+                To help you find your vehicle later, we've saved your parking
+                location to your history.
               </Alert>
 
               <Button
@@ -663,7 +664,7 @@ function Dashboard() {
                 fullWidth
                 onClick={resetNavigation}
               >
-                返回主页
+                Return to Home
               </Button>
             </Paper>
           </Box>

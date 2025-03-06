@@ -30,7 +30,7 @@ const DestinationSelector = ({
   const [processedDestinations, setProcessedDestinations] = useState([]);
 
   useEffect(() => {
-    // 确保 destinations 存在且有 data 属性
+    // Ensure destinations exists and has data property
     if (destinations && destinations.data) {
       setProcessedDestinations(destinations.data);
     } else {
@@ -38,9 +38,9 @@ const DestinationSelector = ({
     }
   }, [destinations]);
 
-  // 获取目的地类别的图标
+  // Get icon for destination category
   const getCategoryIcon = (category) => {
-    // 只修改Education类别的图标和颜色
+    // Special treatment for Education category
     if (category === "Education") {
       return <SchoolIcon sx={{ color: "#ffffff", fontSize: 30 }} />;
     }
@@ -60,16 +60,16 @@ const DestinationSelector = ({
     return categoryMap[category] || <LocationOnIcon color="primary" />;
   };
 
-  // 获取Avatar的背景色
+  // Get background color for Avatar
   const getAvatarBgColor = (category) => {
-    // 为Education类别提供更鲜明的背景色
+    // Provide deeper blue for Education category
     if (category === "Education") {
-      return "#1565c0"; // 更深的蓝色
+      return "#1565c0"; // Deeper blue
     }
-    return "primary.main"; // 其他类别使用默认值
+    return "primary.main"; // Default for other categories
   };
 
-  // 搜索过滤
+  // Filter for search
   const filteredDestinations = processedDestinations.filter(
     (destination) =>
       destination.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -81,15 +81,15 @@ const DestinationSelector = ({
   return (
     <Box sx={{ py: 2 }}>
       <Typography variant="h5" gutterBottom align="center">
-        选择您的目的地
+        Select Your Destination
       </Typography>
       <Typography variant="body1" gutterBottom align="center" sx={{ mb: 2 }}>
-        在奥克兰市选择您想要前往的地点
+        Choose where you want to go in Auckland
       </Typography>
 
       <Box sx={{ mb: 4, display: "flex", justifyContent: "center" }}>
         <TextField
-          label="搜索目的地"
+          label="Search destinations"
           variant="outlined"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -186,7 +186,7 @@ const DestinationSelector = ({
                     },
                   }}
                 >
-                  前往此处
+                  Go Here
                 </Button>
               </CardContent>
             </Card>
