@@ -19,6 +19,10 @@ import {
   Grid,
   Card,
   CardContent,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -28,8 +32,12 @@ import LocalParkingIcon from "@mui/icons-material/LocalParking";
 import PlaceIcon from "@mui/icons-material/Place";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import NavigationIcon from "@mui/icons-material/Navigation";
+import DirectionsIcon from "@mui/icons-material/Directions";
+import TimelapseIcon from "@mui/icons-material/Timelapse";
 import DestinationSelector from "./DestinationSelector";
 import { api } from "../services/api";
+import routesService from "../services/routesService";
 
 function Dashboard() {
   const { currentUser, accessToken, logout } = useAuth();
@@ -45,6 +53,14 @@ function Dashboard() {
   const [navigationProgress, setNavigationProgress] = useState(0);
   const [isParked, setIsParked] = useState(false);
   const navigationTimer = useRef(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [routeDetails, setRouteDetails] = useState(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [loadingRoute, setLoadingRoute] = useState(false);
+  const [mapError, setMapError] = useState("");
+  const mapRef = useRef(null);
+  const googleMapsRef = useRef(null);
+  const directionsRendererRef = useRef(null);
 
   useEffect(() => {
     async function loadInitialData() {
@@ -140,6 +156,210 @@ function Dashboard() {
     setIsParked(false);
     setActiveStep(0);
   };
+
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      setLoadingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const currentLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setUserLocation(currentLocation);
+          setLoadingLocation(false);
+
+          if (selectedDestination && selectedDestination.location) {
+            calculateRoute(currentLocation, selectedDestination.location);
+          }
+        },
+        (error) => {
+          console.error("Error getting current location:", error);
+          setMapError(
+            "Unable to get your current location. Please enable location services."
+          );
+          setLoadingLocation(false);
+
+          const defaultLocation = { lat: -36.8508, lng: 174.7645 };
+          setUserLocation(defaultLocation);
+
+          if (selectedDestination && selectedDestination.location) {
+            calculateRoute(defaultLocation, selectedDestination.location);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+      );
+    } else {
+      setMapError("Geolocation is not supported by this browser.");
+
+      const defaultLocation = { lat: -36.8508, lng: 174.7645 };
+      setUserLocation(defaultLocation);
+    }
+  };
+
+  const calculateRoute = async (origin, destination) => {
+    try {
+      setLoadingRoute(true);
+      setMapError("");
+
+      const routeData = await routesService.calculateRoute(origin, destination);
+
+      setRouteDetails(routeData);
+
+      if (
+        routeData.fromJSAPI &&
+        routeData.rawResult &&
+        mapRef.current &&
+        googleMapsRef.current
+      ) {
+        if (!directionsRendererRef.current) {
+          directionsRendererRef.current =
+            new window.google.maps.DirectionsRenderer({
+              suppressMarkers: false,
+              polylineOptions: {
+                strokeColor: "#4fc3f7",
+                strokeWeight: 5,
+              },
+            });
+        }
+
+        directionsRendererRef.current.setMap(googleMapsRef.current);
+        directionsRendererRef.current.setDirections(routeData.rawResult);
+      } else if (
+        routeData.encodedPolyline &&
+        mapRef.current &&
+        googleMapsRef.current
+      ) {
+        if (directionsRendererRef.current) {
+          directionsRendererRef.current.setMap(null);
+        }
+
+        const decodePath = google.maps.geometry.encoding.decodePath(
+          routeData.encodedPolyline
+        );
+
+        const routePolyline = new google.maps.Polyline({
+          path: decodePath,
+          strokeColor: "#4fc3f7",
+          strokeWeight: 5,
+          strokeOpacity: 0.8,
+        });
+
+        const originMarker = new google.maps.Marker({
+          position: origin,
+          map: googleMapsRef.current,
+          title: "Starting Point",
+          icon: {
+            url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png",
+          },
+        });
+
+        const destinationMarker = new google.maps.Marker({
+          position: destination,
+          map: googleMapsRef.current,
+          title: selectedDestination.name,
+          icon: {
+            url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
+          },
+        });
+
+        routePolyline.setMap(googleMapsRef.current);
+
+        const bounds = new google.maps.LatLngBounds();
+        decodePath.forEach((point) => bounds.extend(point));
+        googleMapsRef.current.fitBounds(bounds);
+      }
+    } catch (error) {
+      console.error("Error calculating route:", error);
+      setMapError("Failed to calculate route. Please try again.");
+    } finally {
+      setLoadingRoute(false);
+    }
+  };
+
+  const initializeMap = () => {
+    if (!mapRef.current || !window.google || !window.google.maps) return;
+
+    const mapCenter = userLocation || { lat: -36.8508, lng: 174.7645 };
+
+    googleMapsRef.current = new window.google.maps.Map(mapRef.current, {
+      zoom: 13,
+      center: mapCenter,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      styles: [
+        {
+          featureType: "all",
+          elementType: "geometry",
+          stylers: [{ color: "#242f3e" }],
+        },
+        {
+          featureType: "all",
+          elementType: "labels.text.stroke",
+          stylers: [{ color: "#242f3e" }],
+        },
+        {
+          featureType: "all",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#746855" }],
+        },
+        {
+          featureType: "road",
+          elementType: "geometry",
+          stylers: [{ color: "#38414e" }],
+        },
+        {
+          featureType: "road",
+          elementType: "geometry.stroke",
+          stylers: [{ color: "#212a37" }],
+        },
+        {
+          featureType: "road",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#9ca5b3" }],
+        },
+        {
+          featureType: "water",
+          elementType: "geometry",
+          stylers: [{ color: "#17263c" }],
+        },
+      ],
+    });
+
+    if (userLocation && selectedDestination && selectedDestination.location) {
+      calculateRoute(userLocation, selectedDestination.location);
+    }
+  };
+
+  useEffect(() => {
+    if (activeStep === 1) {
+      getCurrentLocation();
+
+      const googleMapsScript = document.getElementById("google-maps-script");
+      if (!googleMapsScript) {
+        const script = document.createElement("script");
+        script.id = "google-maps-script";
+        // Get API key from environment variables
+        const apiKey =
+          import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+          "AIzaSyB9g1LcaQTtNj0xQIHqugH_zfFCndrxbBw";
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+        script.async = true;
+        script.defer = true;
+        script.onload = initializeMap;
+        document.head.appendChild(script);
+      } else {
+        initializeMap();
+      }
+    }
+  }, [activeStep, selectedDestination]);
+
+  useEffect(() => {
+    if (activeStep === 1 && userLocation) {
+      initializeMap();
+    }
+  }, [userLocation]);
 
   if (loading) {
     return (
@@ -261,101 +481,272 @@ function Dashboard() {
         )}
 
         {activeStep === 1 && selectedDestination && (
-          <Box sx={{ p: 3, maxWidth: "800px", mx: "auto" }}>
+          <Box sx={{ p: 3, maxWidth: "1200px", mx: "auto" }}>
             <Paper sx={{ p: 3, mb: 3, bgcolor: "#1e1e1e", color: "white" }}>
               <Typography variant="h5" gutterBottom>
                 Confirm Your Destination
               </Typography>
               <Divider sx={{ mb: 2, bgcolor: "rgba(255,255,255,0.1)" }} />
 
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: { xs: "column", md: "row" },
-                  mb: 3,
-                }}
-              >
-                <Box sx={{ flex: 1, mr: { md: 2 } }}>
-                  <Typography variant="subtitle1" fontWeight="bold">
-                    {selectedDestination.name}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    gutterBottom
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={5}>
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      {selectedDestination.name}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      gutterBottom
+                    >
+                      {selectedDestination.address}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ mt: 1, color: "#bbbbbb" }}
+                    >
+                      Category: {selectedDestination.category}
+                    </Typography>
+
+                    {userLocation && routeDetails && (
+                      <Box sx={{ mt: 3, mb: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Route Information:
+                        </Typography>
+                        <List dense>
+                          <ListItem>
+                            <ListItemIcon
+                              sx={{ minWidth: 36, color: "primary.main" }}
+                            >
+                              <DirectionsIcon />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary="Distance"
+                              secondary={routeDetails.distance}
+                              primaryTypographyProps={{ color: "white" }}
+                              secondaryTypographyProps={{ color: "#bbbbbb" }}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemIcon
+                              sx={{ minWidth: 36, color: "primary.main" }}
+                            >
+                              <TimelapseIcon />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary="Estimated Travel Time"
+                              secondary={routeDetails.duration}
+                              primaryTypographyProps={{ color: "white" }}
+                              secondaryTypographyProps={{ color: "#bbbbbb" }}
+                            />
+                          </ListItem>
+                        </List>
+                      </Box>
+                    )}
+
+                    <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                      Select Your Vehicle:
+                    </Typography>
+                    <Grid container spacing={1}>
+                      {vehicles.map((vehicle) => (
+                        <Grid item xs={6} key={vehicle.id}>
+                          <Card
+                            sx={{
+                              bgcolor:
+                                selectedVehicle?.id === vehicle.id
+                                  ? "primary.dark"
+                                  : "#333333",
+                              cursor: "pointer",
+                              "&:hover": { bgcolor: "#444444" },
+                            }}
+                            onClick={() => setSelectedVehicle(vehicle)}
+                          >
+                            <CardContent>
+                              <Box
+                                sx={{ display: "flex", alignItems: "center" }}
+                              >
+                                <DirectionsCarIcon sx={{ mr: 1 }} />
+                                <Typography variant="body2">
+                                  {vehicle.name}
+                                </Typography>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                    size="large"
+                    onClick={confirmDestination}
+                    disabled={!selectedVehicle || loadingRoute}
+                    sx={{ mt: 2 }}
                   >
-                    {selectedDestination.address}
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 1, color: "#bbbbbb" }}>
-                    Category: {selectedDestination.category}
-                  </Typography>
+                    {loadingRoute ? (
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <CircularProgress
+                          size={20}
+                          sx={{ mr: 1 }}
+                          color="inherit"
+                        />
+                        Calculating Route...
+                      </Box>
+                    ) : (
+                      "Confirm and Start Navigation"
+                    )}
+                  </Button>
+                </Grid>
 
-                  <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                    Select Your Vehicle:
-                  </Typography>
-                  <Grid container spacing={1}>
-                    {vehicles.map((vehicle) => (
-                      <Grid item xs={6} key={vehicle.id}>
-                        <Card
-                          sx={{
-                            bgcolor:
-                              selectedVehicle?.id === vehicle.id
-                                ? "primary.dark"
-                                : "#333333",
-                            cursor: "pointer",
-                            "&:hover": { bgcolor: "#444444" },
-                          }}
-                          onClick={() => setSelectedVehicle(vehicle)}
+                <Grid item xs={12} md={7}>
+                  <Paper
+                    sx={{
+                      height: "400px",
+                      width: "100%",
+                      bgcolor: "#2a2a2a",
+                      position: "relative",
+                      overflow: "hidden",
+                      borderRadius: 1,
+                      mb: 2,
+                    }}
+                  >
+                    {mapError && (
+                      <Alert
+                        severity="error"
+                        sx={{
+                          position: "absolute",
+                          top: 10,
+                          left: 10,
+                          right: 10,
+                          zIndex: 10,
+                        }}
+                      >
+                        {mapError}
+                      </Alert>
+                    )}
+
+                    {(loadingLocation || !userLocation) && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexDirection: "column",
+                          backgroundColor: "rgba(0,0,0,0.7)",
+                          zIndex: 5,
+                        }}
+                      >
+                        <CircularProgress color="primary" size={40} />
+                        <Typography
+                          variant="body2"
+                          sx={{ mt: 2, color: "white" }}
                         >
-                          <CardContent>
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                              <DirectionsCarIcon sx={{ mr: 1 }} />
-                              <Typography variant="body2">
-                                {vehicle.name}
-                              </Typography>
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Box>
+                          Getting your location...
+                        </Typography>
+                      </Box>
+                    )}
 
-                <Box
-                  sx={{
-                    minWidth: { xs: "100%", md: "300px" },
-                    height: "200px",
-                    mt: { xs: 2, md: 0 },
-                    backgroundColor: "#2a2a2a",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundImage: `url(/maps/destinations/${
-                      selectedDestination.id || "default"
-                    }.jpg)`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                    borderRadius: 1,
-                  }}
-                >
-                  {!selectedDestination.image && (
-                    <PlaceIcon
-                      sx={{ fontSize: 80, color: "rgba(255,255,255,0.2)" }}
+                    <Box
+                      ref={mapRef}
+                      sx={{
+                        height: "100%",
+                        width: "100%",
+                        opacity: loadingRoute ? 0.6 : 1,
+                        transition: "opacity 0.3s",
+                      }}
                     />
-                  )}
-                </Box>
-              </Box>
 
-              <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                size="large"
-                onClick={confirmDestination}
-                disabled={!selectedVehicle}
-              >
-                Confirm and Start Navigation
-              </Button>
+                    {loadingRoute && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: "rgba(0,0,0,0.5)",
+                          zIndex: 5,
+                        }}
+                      >
+                        <CircularProgress color="primary" />
+                      </Box>
+                    )}
+                  </Paper>
+
+                  {routeDetails && routeDetails.steps && (
+                    <Paper
+                      sx={{
+                        bgcolor: "#2a2a2a",
+                        p: 2,
+                        maxHeight: "200px",
+                        overflow: "auto",
+                      }}
+                    >
+                      <Typography variant="subtitle2" gutterBottom>
+                        Turn-by-Turn Directions:
+                      </Typography>
+                      <List dense sx={{ p: 0 }}>
+                        {routeDetails.steps.slice(0, 5).map((step, index) => (
+                          <ListItem
+                            key={index}
+                            divider={
+                              index < routeDetails.steps.slice(0, 5).length - 1
+                            }
+                          >
+                            <ListItemIcon
+                              sx={{ minWidth: 36, color: "primary.main" }}
+                            >
+                              <NavigationIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={`Step ${index + 1}`}
+                              secondary={
+                                <span
+                                  dangerouslySetInnerHTML={{
+                                    __html: step.instructions,
+                                  }}
+                                />
+                              }
+                              primaryTypographyProps={{
+                                color: "white",
+                                variant: "body2",
+                              }}
+                              secondaryTypographyProps={{
+                                color: "#bbbbbb",
+                                variant: "caption",
+                              }}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                      {routeDetails.steps.length > 5 && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: "block",
+                            textAlign: "center",
+                            mt: 1,
+                            color: "#bbbbbb",
+                          }}
+                        >
+                          + {routeDetails.steps.length - 5} more steps
+                        </Typography>
+                      )}
+                    </Paper>
+                  )}
+                </Grid>
+              </Grid>
             </Paper>
           </Box>
         )}
