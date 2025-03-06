@@ -490,62 +490,137 @@ function Dashboard() {
 
               <Grid container spacing={3}>
                 <Grid item xs={12} md={5}>
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      {selectedDestination.name}
+                  <Box
+                    sx={{
+                      mb: 3,
+                      p: 2,
+                      bgcolor: "rgba(0,0,0,0.2)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                      <MyLocationIcon sx={{ mr: 1, color: "#4fc3f7" }} />
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        Current Location
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="#bbbbbb">
+                      {userLocation
+                        ? `${userLocation.lat.toFixed(
+                            4
+                          )}, ${userLocation.lng.toFixed(4)}`
+                        : "Detecting your location..."}
                     </Typography>
                     <Typography
-                      variant="body2"
+                      variant="caption"
                       color="text.secondary"
+                      sx={{ display: "block", mt: 0.5 }}
+                    >
+                      {loadingLocation
+                        ? "Getting precise location..."
+                        : "Location services enabled"}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      mb: 3,
+                      p: 2,
+                      bgcolor: "rgba(0,0,0,0.2)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                      <PlaceIcon sx={{ mr: 1, color: "#f44336" }} />
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        Destination
+                      </Typography>
+                    </Box>
+                    <Typography
+                      variant="body1"
+                      fontWeight="medium"
                       gutterBottom
                     >
+                      {selectedDestination.name}
+                    </Typography>
+                    <Typography variant="body2" color="#bbbbbb" gutterBottom>
                       {selectedDestination.address}
                     </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ mt: 1, color: "#bbbbbb" }}
-                    >
-                      Category: {selectedDestination.category}
-                    </Typography>
-
-                    {userLocation && routeDetails && (
-                      <Box sx={{ mt: 3, mb: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Route Information:
-                        </Typography>
-                        <List dense>
-                          <ListItem>
-                            <ListItemIcon
-                              sx={{ minWidth: 36, color: "primary.main" }}
-                            >
-                              <DirectionsIcon />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary="Distance"
-                              secondary={routeDetails.distance}
-                              primaryTypographyProps={{ color: "white" }}
-                              secondaryTypographyProps={{ color: "#bbbbbb" }}
-                            />
-                          </ListItem>
-                          <ListItem>
-                            <ListItemIcon
-                              sx={{ minWidth: 36, color: "primary.main" }}
-                            >
-                              <TimelapseIcon />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary="Estimated Travel Time"
-                              secondary={routeDetails.duration}
-                              primaryTypographyProps={{ color: "white" }}
-                              secondaryTypographyProps={{ color: "#bbbbbb" }}
-                            />
-                          </ListItem>
-                        </List>
+                    <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+                      <Box
+                        sx={{
+                          bgcolor: "rgba(255,255,255,0.1)",
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 1,
+                          fontSize: "0.75rem",
+                        }}
+                      >
+                        {selectedDestination.category}
                       </Box>
-                    )}
+                    </Box>
+                  </Box>
 
-                    <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                      Select Your Vehicle:
+                  {userLocation && routeDetails && (
+                    <Box
+                      sx={{
+                        mb: 3,
+                        p: 2,
+                        bgcolor: "rgba(0,0,0,0.2)",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle2"
+                        fontWeight="bold"
+                        gutterBottom
+                      >
+                        Route Information
+                      </Typography>
+                      <List dense>
+                        <ListItem sx={{ px: 1, py: 0.5 }}>
+                          <ListItemIcon
+                            sx={{ minWidth: 36, color: "primary.main" }}
+                          >
+                            <DirectionsIcon />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary="Distance"
+                            secondary={routeDetails.distance}
+                            primaryTypographyProps={{
+                              color: "white",
+                              fontWeight: "medium",
+                            }}
+                            secondaryTypographyProps={{ color: "#bbbbbb" }}
+                          />
+                        </ListItem>
+                        <ListItem sx={{ px: 1, py: 0.5 }}>
+                          <ListItemIcon
+                            sx={{ minWidth: 36, color: "primary.main" }}
+                          >
+                            <TimelapseIcon />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary="Estimated Travel Time"
+                            secondary={routeDetails.duration}
+                            primaryTypographyProps={{
+                              color: "white",
+                              fontWeight: "medium",
+                            }}
+                            secondaryTypographyProps={{ color: "#bbbbbb" }}
+                          />
+                        </ListItem>
+                      </List>
+                    </Box>
+                  )}
+
+                  <Box sx={{ mb: 3 }}>
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight="bold"
+                      sx={{ mb: 1 }}
+                    >
+                      Select Your Vehicle
                     </Typography>
                     <Grid container spacing={1}>
                       {vehicles.map((vehicle) => (
@@ -555,13 +630,18 @@ function Dashboard() {
                               bgcolor:
                                 selectedVehicle?.id === vehicle.id
                                   ? "primary.dark"
-                                  : "#333333",
+                                  : "rgba(0,0,0,0.2)",
                               cursor: "pointer",
-                              "&:hover": { bgcolor: "#444444" },
+                              "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                              transition: "background-color 0.3s",
+                              border:
+                                selectedVehicle?.id === vehicle.id
+                                  ? "1px solid #4fc3f7"
+                                  : "1px solid rgba(255,255,255,0.1)",
                             }}
                             onClick={() => setSelectedVehicle(vehicle)}
                           >
-                            <CardContent>
+                            <CardContent sx={{ p: 1.5 }}>
                               <Box
                                 sx={{ display: "flex", alignItems: "center" }}
                               >
@@ -584,7 +664,12 @@ function Dashboard() {
                     size="large"
                     onClick={confirmDestination}
                     disabled={!selectedVehicle || loadingRoute}
-                    sx={{ mt: 2 }}
+                    sx={{
+                      mt: 2,
+                      py: 1.2,
+                      fontWeight: "bold",
+                      boxShadow: 3,
+                    }}
                   >
                     {loadingRoute ? (
                       <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -596,7 +681,7 @@ function Dashboard() {
                         Calculating Route...
                       </Box>
                     ) : (
-                      "Confirm and Start Navigation"
+                      "CONFIRM AND START NAVIGATION"
                     )}
                   </Button>
                 </Grid>
@@ -604,13 +689,14 @@ function Dashboard() {
                 <Grid item xs={12} md={7}>
                   <Paper
                     sx={{
-                      height: "400px",
+                      height: "380px",
                       width: "100%",
                       bgcolor: "#2a2a2a",
                       position: "relative",
                       overflow: "hidden",
                       borderRadius: 1,
                       mb: 2,
+                      boxShadow: 3,
                     }}
                   >
                     {mapError && (
@@ -682,69 +768,188 @@ function Dashboard() {
                         <CircularProgress color="primary" />
                       </Box>
                     )}
-                  </Paper>
 
-                  {routeDetails && routeDetails.steps && (
-                    <Paper
+                    <Box
                       sx={{
-                        bgcolor: "#2a2a2a",
-                        p: 2,
-                        maxHeight: "200px",
-                        overflow: "auto",
+                        position: "absolute",
+                        bottom: 16,
+                        right: 16,
+                        bgcolor: "rgba(0,0,0,0.7)",
+                        borderRadius: 1,
+                        p: 1,
+                        zIndex: 4,
                       }}
                     >
-                      <Typography variant="subtitle2" gutterBottom>
-                        Turn-by-Turn Directions:
-                      </Typography>
-                      <List dense sx={{ p: 0 }}>
-                        {routeDetails.steps.slice(0, 5).map((step, index) => (
-                          <ListItem
-                            key={index}
-                            divider={
-                              index < routeDetails.steps.slice(0, 5).length - 1
-                            }
-                          >
-                            <ListItemIcon
-                              sx={{ minWidth: 36, color: "primary.main" }}
-                            >
-                              <NavigationIcon fontSize="small" />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary={`Step ${index + 1}`}
-                              secondary={
-                                <span
-                                  dangerouslySetInnerHTML={{
-                                    __html: step.instructions,
-                                  }}
-                                />
-                              }
-                              primaryTypographyProps={{
-                                color: "white",
-                                variant: "body2",
-                              }}
-                              secondaryTypographyProps={{
-                                color: "#bbbbbb",
-                                variant: "caption",
-                              }}
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-                      {routeDetails.steps.length > 5 && (
-                        <Typography
-                          variant="caption"
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", mb: 0.5 }}
+                      >
+                        <Box
                           sx={{
-                            display: "block",
-                            textAlign: "center",
-                            mt: 1,
-                            color: "#bbbbbb",
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            bgcolor: "#4CAF50",
+                            mr: 1,
                           }}
-                        >
-                          + {routeDetails.steps.length - 5} more steps
+                        />
+                        <Typography variant="caption" color="white">
+                          Current Location
                         </Typography>
-                      )}
-                    </Paper>
-                  )}
+                      </Box>
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            bgcolor: "#F44336",
+                            mr: 1,
+                          }}
+                        />
+                        <Typography variant="caption" color="white">
+                          Destination
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Paper>
+
+                  <Paper
+                    sx={{
+                      bgcolor: "#2a2a2a",
+                      p: 2,
+                      borderRadius: 1,
+                      height: "210px",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight="bold"
+                      gutterBottom
+                    >
+                      Turn-by-Turn Directions
+                    </Typography>
+
+                    {!routeDetails || !routeDetails.steps ? (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          flex: 1,
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          {loadingRoute
+                            ? "Calculating directions..."
+                            : "No directions available"}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <>
+                        <Box sx={{ overflow: "auto", flex: 1 }}>
+                          <List dense sx={{ p: 0 }}>
+                            {routeDetails.steps
+                              .slice(0, 5)
+                              .map((step, index) => (
+                                <ListItem
+                                  key={index}
+                                  divider={
+                                    index <
+                                    Math.min(routeDetails.steps.length, 5) - 1
+                                  }
+                                  sx={{ py: 1 }}
+                                >
+                                  <ListItemIcon
+                                    sx={{ minWidth: 36, color: "primary.main" }}
+                                  >
+                                    <NavigationIcon fontSize="small" />
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={`Step ${index + 1}`}
+                                    secondary={
+                                      <Box>
+                                        <span
+                                          dangerouslySetInnerHTML={{
+                                            __html: step.instructions,
+                                          }}
+                                        />
+                                        {step.distance && (
+                                          <Typography
+                                            variant="caption"
+                                            component="div"
+                                            sx={{ mt: 0.5, color: "#9e9e9e" }}
+                                          >
+                                            {step.distance} •{" "}
+                                            {step.duration || ""}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    }
+                                    primaryTypographyProps={{
+                                      color: "white",
+                                      variant: "body2",
+                                      fontWeight: "medium",
+                                    }}
+                                    secondaryTypographyProps={{
+                                      color: "#bbbbbb",
+                                      variant: "caption",
+                                    }}
+                                  />
+                                </ListItem>
+                              ))}
+
+                            {routeDetails.steps.length < 5 &&
+                              Array.from({
+                                length: 5 - routeDetails.steps.length,
+                              }).map((_, index) => (
+                                <ListItem
+                                  key={`empty-${index}`}
+                                  divider={
+                                    index < 5 - routeDetails.steps.length - 1
+                                  }
+                                  sx={{ py: 1.5 }}
+                                >
+                                  <ListItemIcon
+                                    sx={{
+                                      minWidth: 36,
+                                      color: "rgba(255,255,255,0.2)",
+                                    }}
+                                  >
+                                    <NavigationIcon fontSize="small" />
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary="End of route"
+                                    primaryTypographyProps={{
+                                      color: "rgba(255,255,255,0.3)",
+                                      variant: "body2",
+                                      fontStyle: "italic",
+                                    }}
+                                  />
+                                </ListItem>
+                              ))}
+                          </List>
+                        </Box>
+                        {routeDetails.steps.length > 5 && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              display: "block",
+                              textAlign: "center",
+                              mt: 1,
+                              color: "#bbbbbb",
+                              borderTop: "1px solid rgba(255,255,255,0.1)",
+                              pt: 1,
+                            }}
+                          >
+                            + {routeDetails.steps.length - 5} more steps to
+                            destination
+                          </Typography>
+                        )}
+                      </>
+                    )}
+                  </Paper>
                 </Grid>
               </Grid>
             </Paper>
