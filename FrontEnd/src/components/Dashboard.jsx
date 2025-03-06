@@ -23,6 +23,7 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  LinearProgress,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -995,102 +996,13 @@ function Dashboard() {
               </Typography>
               <Divider sx={{ mb: 2, bgcolor: "rgba(255,255,255,0.1)" }} />
 
-              <Box
-                sx={{
-                  height: "300px",
-                  bgcolor: "#333333",
-                  mb: 2,
-                  borderRadius: 1,
-                  position: "relative",
-                  backgroundImage: `url(/maps/auckland_map.jpg)`,
-                  backgroundSize: "cover",
-                  overflow: "hidden",
-                }}
-              >
-                <Box
-                  sx={{
-                    position: "absolute",
-                    left: "30%",
-                    top: "60%",
-                    transform: "translate(-50%, -50%)",
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    bgcolor: "primary.main",
-                    border: "3px solid white",
-                    boxShadow: 3,
-                    zIndex: 2,
-                  }}
-                />
+              <NavigationMap
+                origin={userLocation || { lat: -36.8508, lng: 174.7645 }}
+                destination={selectedDestination.location}
+                navigationProgress={navigationProgress}
+              />
 
-                <Box
-                  sx={{
-                    position: "absolute",
-                    left: `${
-                      50 + (selectedDestination.location.lng - 174.763) * 1000
-                    }%`,
-                    top: `${
-                      50 + (selectedDestination.location.lat - -36.848) * 1000
-                    }%`,
-                    transform: "translate(-50%, -50%)",
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
-                    bgcolor: "secondary.main",
-                    border: "3px solid white",
-                    boxShadow: 3,
-                    zIndex: 2,
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography variant="caption" color="white" fontWeight="bold">
-                    D
-                  </Typography>
-                </Box>
-
-                <Box
-                  sx={{
-                    position: "absolute",
-                    left: "30%",
-                    top: "60%",
-                    width: "40%",
-                    height: "2px",
-                    bgcolor: "primary.main",
-                    transformOrigin: "left center",
-                    transform: `scaleX(${navigationProgress / 100})`,
-                    zIndex: 1,
-                  }}
-                />
-
-                <Box
-                  sx={{
-                    position: "absolute",
-                    left: `calc(30% + ${(navigationProgress / 100) * 40}%)`,
-                    top: "60%",
-                    transform: "translate(-50%, -50%)",
-                    width: 32,
-                    height: 32,
-                    borderRadius: "50%",
-                    bgcolor: "#ffffff",
-                    border: "2px solid",
-                    borderColor: "primary.main",
-                    boxShadow: 2,
-                    zIndex: 3,
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    transition: "left 0.5s ease",
-                  }}
-                >
-                  <Typography variant="caption" fontWeight="bold">
-                    🚗
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Box sx={{ mb: 2 }}>
+              <Box sx={{ mb: 2, mt: 2 }}>
                 <Typography variant="subtitle1">Navigation Info</Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
                   From: Auckland City Center
@@ -1099,10 +1011,57 @@ function Dashboard() {
                   To: {selectedDestination.name}
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  Distance: {Math.floor(Math.random() * 5) + 2} km
+                  Distance:{" "}
+                  {routeDetails?.distance ||
+                    `${Math.floor(Math.random() * 5) + 2} km`}
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  Estimated Time: {Math.floor(Math.random() * 15) + 5} min
+                  Estimated Time:{" "}
+                  {routeDetails?.duration ||
+                    `${Math.floor(Math.random() * 15) + 5} min`}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  mb: 2,
+                  mt: 3,
+                  p: 1,
+                  bgcolor: "rgba(0,0,0,0.2)",
+                  borderRadius: 1,
+                  position: "relative",
+                  overflow: "hidden",
+                  height: "24px",
+                }}
+              >
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    height: "100%",
+                    width: `${navigationProgress}%`,
+                    bgcolor: "primary.main",
+                    transition: "width 0.3s ease-in-out",
+                  }}
+                />
+                <Typography
+                  variant="caption"
+                  sx={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontWeight: "bold",
+                    zIndex: 1,
+                  }}
+                >
+                  DRIVING ({navigationProgress}%)
                 </Typography>
               </Box>
 
@@ -1119,8 +1078,8 @@ function Dashboard() {
                 disabled={navigationProgress < 100}
               >
                 {navigationProgress < 100
-                  ? `Driving (${navigationProgress}%)`
-                  : "Arrived at Parking Lot"}
+                  ? `Please Wait...`
+                  : "ARRIVED AT PARKING LOT"}
               </Button>
             </Paper>
           </Box>
@@ -1302,3 +1261,514 @@ function Dashboard() {
 }
 
 export default Dashboard;
+
+// NavigationMap组件用于显示导航地图和动态移动的标记
+function NavigationMap({ origin, destination, navigationProgress }) {
+  const mapRef = useRef(null);
+  const googleMapRef = useRef(null);
+  const routePolylineRef = useRef(null);
+  const markerRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const routePathRef = useRef([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [routeDetails, setRouteDetails] = useState(null);
+
+  // 初始化地图
+  const initMap = async () => {
+    if (!mapRef.current || !window.google || !window.google.maps) {
+      console.warn("Cannot initialize map: Google Maps not loaded");
+      setError("Cannot load map. Please check your network connection.");
+      return;
+    }
+
+    try {
+      // 创建地图实例
+      googleMapRef.current = new window.google.maps.Map(mapRef.current, {
+        zoom: 14,
+        center: origin,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        mapId: "5a8d875e3485586f",
+        styles: [
+          {
+            featureType: "all",
+            elementType: "geometry",
+            stylers: [{ color: "#242f3e" }],
+          },
+          {
+            featureType: "all",
+            elementType: "labels.text.stroke",
+            stylers: [{ color: "#242f3e" }],
+          },
+          {
+            featureType: "all",
+            elementType: "labels.text.fill",
+            stylers: [{ color: "#746855" }],
+          },
+          {
+            featureType: "road",
+            elementType: "geometry",
+            stylers: [{ color: "#38414e" }],
+          },
+          {
+            featureType: "road",
+            elementType: "geometry.stroke",
+            stylers: [{ color: "#212a37" }],
+          },
+          {
+            featureType: "road",
+            elementType: "labels.text.fill",
+            stylers: [{ color: "#9ca5b3" }],
+          },
+          {
+            featureType: "water",
+            elementType: "geometry",
+            stylers: [{ color: "#17263c" }],
+          },
+        ],
+      });
+
+      // 计算并显示路线
+      await calculateAndDisplayRoute(origin, destination);
+    } catch (error) {
+      console.error("Map initialization error:", error);
+      setError("Failed to load map. Please refresh the page.");
+    }
+  };
+
+  // 计算和显示路线
+  const calculateAndDisplayRoute = async (origin, destination) => {
+    if (!googleMapRef.current) return;
+
+    setLoading(true);
+
+    try {
+      // 使用routesService计算路线
+      const routeResult = await routesService.calculateRoute(
+        origin,
+        destination
+      );
+      setRouteDetails(routeResult);
+
+      // 检查是否有编码的多段线路径
+      if (routeResult.encodedPolyline) {
+        // 使用Google Maps geometry库来解码多段线
+        if (
+          window.google.maps.geometry &&
+          window.google.maps.geometry.encoding
+        ) {
+          const path = google.maps.geometry.encoding.decodePath(
+            routeResult.encodedPolyline
+          );
+          routePathRef.current = path;
+
+          // 创建路线线条
+          if (routePolylineRef.current) {
+            routePolylineRef.current.setMap(null);
+          }
+
+          routePolylineRef.current = new window.google.maps.Polyline({
+            path: path,
+            geodesic: true,
+            strokeColor: "#4fc3f7",
+            strokeOpacity: 1.0,
+            strokeWeight: 4,
+          });
+
+          routePolylineRef.current.setMap(googleMapRef.current);
+
+          // 设置地图边界以显示整个路线
+          const bounds = new window.google.maps.LatLngBounds();
+          bounds.extend(origin);
+          bounds.extend(destination);
+          path.forEach((point) => bounds.extend(point));
+          googleMapRef.current.fitBounds(bounds);
+
+          // 创建起点和终点标记
+          addFixedMarkers(origin, destination);
+
+          // 创建会移动的红点标记
+          createMovingMarker(path[0]);
+
+          setLoading(false);
+        } else {
+          console.warn(
+            "Google Maps Geometry library not available for polyline decoding"
+          );
+          createStaticRoutePath(origin, destination);
+          setLoading(false);
+        }
+      } else if (routeResult.fromJSAPI && routeResult.rawResult) {
+        // 处理从JavaScript API返回的结果
+        const route = routeResult.rawResult.routes[0];
+        const path = route.overview_path;
+        routePathRef.current = path;
+
+        // 创建路线线条
+        if (routePolylineRef.current) {
+          routePolylineRef.current.setMap(null);
+        }
+
+        routePolylineRef.current = new window.google.maps.Polyline({
+          path: path,
+          geodesic: true,
+          strokeColor: "#4fc3f7",
+          strokeOpacity: 1.0,
+          strokeWeight: 4,
+        });
+
+        routePolylineRef.current.setMap(googleMapRef.current);
+
+        // 设置地图边界以显示整个路线
+        const bounds = new window.google.maps.LatLngBounds();
+        bounds.extend(origin);
+        bounds.extend(destination);
+        path.forEach((point) => bounds.extend(point));
+        googleMapRef.current.fitBounds(bounds);
+
+        // 创建起点和终点标记
+        addFixedMarkers(origin, destination);
+
+        // 创建会移动的红点标记
+        createMovingMarker(path[0]);
+
+        setLoading(false);
+      } else {
+        // 如果没有路线数据，使用静态路径
+        console.warn("No route data available, using static path");
+        createStaticRoutePath(origin, destination);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error("Route calculation error:", error);
+      createStaticRoutePath(origin, destination);
+      setLoading(false);
+    }
+  };
+
+  // 创建静态路径（如果API不可用）
+  const createStaticRoutePath = (origin, destination) => {
+    try {
+      // 创建一条简单的直线作为路径
+      const simplePath = [
+        new window.google.maps.LatLng(origin.lat, origin.lng),
+        new window.google.maps.LatLng(destination.lat, destination.lng),
+      ];
+
+      routePathRef.current = simplePath;
+
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+      }
+
+      routePolylineRef.current = new window.google.maps.Polyline({
+        path: simplePath,
+        geodesic: true,
+        strokeColor: "#4fc3f7",
+        strokeOpacity: 1.0,
+        strokeWeight: 4,
+      });
+
+      routePolylineRef.current.setMap(googleMapRef.current);
+
+      // 设置地图边界
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(origin);
+      bounds.extend(destination);
+      googleMapRef.current.fitBounds(bounds);
+
+      // 添加固定标记
+      addFixedMarkers(origin, destination);
+
+      // 创建会移动的红点标记
+      createMovingMarker(simplePath[0]);
+    } catch (error) {
+      console.error("创建静态路线错误:", error);
+      setError("无法显示导航路线。请刷新页面重试。");
+    }
+  };
+
+  // 添加固定的起点和终点标记
+  const addFixedMarkers = (origin, destination) => {
+    // 添加起点标记
+    new window.google.maps.Marker({
+      position: origin,
+      map: googleMapRef.current,
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 7,
+        fillColor: "#4CAF50",
+        fillOpacity: 1,
+        strokeWeight: 2,
+        strokeColor: "#FFFFFF",
+      },
+      zIndex: 1,
+    });
+
+    // 添加终点标记
+    new window.google.maps.Marker({
+      position: destination,
+      map: googleMapRef.current,
+      label: {
+        text: "D",
+        color: "#FFFFFF",
+        fontWeight: "bold",
+      },
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 9,
+        fillColor: "#F44336",
+        fillOpacity: 1,
+        strokeWeight: 2,
+        strokeColor: "#FFFFFF",
+      },
+      zIndex: 1,
+    });
+  };
+
+  // 创建移动的车辆标记
+  const createMovingMarker = (initialPosition) => {
+    if (markerRef.current) {
+      markerRef.current.setMap(null);
+    }
+
+    // 创建红点标记
+    markerRef.current = new window.google.maps.Marker({
+      position: initialPosition,
+      map: googleMapRef.current,
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 6,
+        fillColor: "#FF4136",
+        fillOpacity: 1,
+        strokeWeight: 2,
+        strokeColor: "#FFFFFF",
+      },
+      zIndex: 2,
+      // 添加脉冲效果
+      animation: window.google.maps.Animation.BOUNCE,
+    });
+
+    // 停止动画效果，避免持续跳动
+    setTimeout(() => {
+      if (markerRef.current) {
+        markerRef.current.setAnimation(null);
+      }
+    }, 2000);
+  };
+
+  // 计算两点之间的角度
+  const calculateHeading = (point1, point2) => {
+    return window.google.maps.geometry.spherical.computeHeading(
+      new window.google.maps.LatLng(point1.lat(), point1.lng()),
+      new window.google.maps.LatLng(point2.lat(), point2.lng())
+    );
+  };
+
+  // 动画移动车辆标记
+  const startCarAnimation = () => {
+    const path = routePathRef.current;
+    if (!path || path.length < 2 || !markerRef.current) return;
+
+    // 清除之前的动画
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    // 计算当前应该移动到的位置
+    const progress = navigationProgress / 100; // 0到1之间
+    const totalPathLength = path.length - 1;
+
+    const animate = () => {
+      // 计算当前位置
+      const currentProgress = navigationProgress / 100;
+
+      if (currentProgress >= 1) {
+        // 已到达终点
+        if (markerRef.current) {
+          markerRef.current.setPosition(path[path.length - 1]);
+        }
+        return;
+      }
+
+      // 计算当前应该在路径的哪个部分
+      const pathIndex = Math.min(
+        Math.floor(currentProgress * totalPathLength),
+        totalPathLength - 1
+      );
+
+      // 计算两点之间的位置
+      const segmentProgress = currentProgress * totalPathLength - pathIndex;
+
+      const currentPoint = path[pathIndex];
+      const nextPoint = path[pathIndex + 1];
+
+      // 计算当前位置（两点之间的插值）
+      const lat =
+        currentPoint.lat() +
+        (nextPoint.lat() - currentPoint.lat()) * segmentProgress;
+      const lng =
+        currentPoint.lng() +
+        (nextPoint.lng() - currentPoint.lng()) * segmentProgress;
+
+      // 更新标记位置
+      const newPosition = new window.google.maps.LatLng(lat, lng);
+      markerRef.current.setPosition(newPosition);
+
+      // 请求下一帧动画
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    // 启动动画
+    animate();
+  };
+
+  // 初始化地图
+  useEffect(() => {
+    initMap();
+
+    // 清理函数
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+      }
+
+      if (markerRef.current) {
+        markerRef.current.setMap(null);
+      }
+    };
+  }, [origin, destination]);
+
+  // 根据导航进度更新车辆位置
+  useEffect(() => {
+    if (!loading && markerRef.current) {
+      startCarAnimation();
+    }
+  }, [navigationProgress, loading]);
+
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        height: "300px",
+        bgcolor: "#333333",
+        borderRadius: 1,
+        overflow: "hidden",
+      }}
+    >
+      {loading && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "rgba(0,0,0,0.5)",
+            zIndex: 2,
+          }}
+        >
+          <CircularProgress color="primary" />
+        </Box>
+      )}
+
+      {error && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "rgba(0,0,0,0.5)",
+            zIndex: 2,
+            p: 2,
+          }}
+        >
+          <Alert severity="error" sx={{ width: "100%" }}>
+            {error}
+          </Alert>
+        </Box>
+      )}
+
+      <Box
+        ref={mapRef}
+        sx={{
+          height: "100%",
+          width: "100%",
+        }}
+      />
+
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: 16,
+          right: 16,
+          bgcolor: "rgba(0,0,0,0.7)",
+          borderRadius: 1,
+          p: 1.5,
+          zIndex: 1,
+        }}
+      >
+        <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+          Map Legend
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+          <Box
+            sx={{
+              width: 12,
+              height: 12,
+              borderRadius: "50%",
+              bgcolor: "#4CAF50",
+              mr: 1,
+            }}
+          />
+          <Typography variant="caption" color="white">
+            Start
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+          <Box
+            sx={{
+              width: 12,
+              height: 12,
+              borderRadius: "50%",
+              bgcolor: "#F44336",
+              mr: 1,
+            }}
+          />
+          <Typography variant="caption" color="white">
+            Destination
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Box
+            sx={{
+              width: 12,
+              height: 12,
+              borderRadius: "50%",
+              bgcolor: "#FF4136",
+              border: "2px solid white",
+              mr: 1,
+            }}
+          />
+          <Typography variant="caption" color="white">
+            Current Position
+          </Typography>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
