@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Grid,
   Card,
-  CardMedia,
   CardContent,
   Typography,
   Button,
@@ -10,6 +9,7 @@ import {
   Chip,
   TextField,
   InputAdornment,
+  Avatar,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
@@ -21,35 +21,51 @@ import ParkIcon from "@mui/icons-material/Park";
 import BeachAccessIcon from "@mui/icons-material/BeachAccess";
 import CasinoIcon from "@mui/icons-material/Casino";
 
-const DestinationSelector = ({ destinations, onSelectDestination }) => {
+const DestinationSelector = ({ destinations = [], onSelectDestination }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [processedDestinations, setProcessedDestinations] = useState([]);
+
+  useEffect(() => {
+    // 确保 destinations 存在且有 data 属性
+    if (destinations && destinations.data) {
+      setProcessedDestinations(destinations.data);
+    } else {
+      setProcessedDestinations([]);
+    }
+  }, [destinations]);
 
   // 获取目的地类别的图标
   const getCategoryIcon = (category) => {
-    switch (category.toLowerCase()) {
-      case "education":
-        return <SchoolIcon color="primary" />;
-      case "medical":
-        return <LocalHospitalIcon color="error" />;
-      case "shopping":
-        return <ShoppingCartIcon color="success" />;
-      case "leisure/dining":
-      case "leisure/family":
-        return <RestaurantIcon color="warning" />;
-      case "parks":
-      case "parks/attractions":
-        return <ParkIcon color="success" />;
-      case "beach/leisure":
-        return <BeachAccessIcon color="info" />;
-      case "tourism/entertainment":
-        return <CasinoIcon color="secondary" />;
-      default:
-        return <LocationOnIcon color="primary" />;
+    // 只修改Education类别的图标和颜色
+    if (category === "Education") {
+      return <SchoolIcon sx={{ color: "#ffffff", fontSize: 30 }} />;
     }
+
+    const categoryMap = {
+      Medical: <LocalHospitalIcon color="error" />,
+      Shopping: <ShoppingCartIcon color="success" />,
+      "Leisure/Dining": <RestaurantIcon color="warning" />,
+      "Leisure/Family": <RestaurantIcon color="warning" />,
+      Parks: <ParkIcon color="success" />,
+      "Parks/Attractions": <ParkIcon color="success" />,
+      "Beach/Leisure": <BeachAccessIcon color="info" />,
+      "Tourism/Entertainment": <CasinoIcon color="secondary" />,
+    };
+
+    return categoryMap[category] || <LocationOnIcon color="primary" />;
+  };
+
+  // 获取Avatar的背景色
+  const getAvatarBgColor = (category) => {
+    // 为Education类别提供更鲜明的背景色
+    if (category === "Education") {
+      return "#1565c0"; // 更深的蓝色
+    }
+    return "primary.main"; // 其他类别使用默认值
   };
 
   // 搜索过滤
-  const filteredDestinations = destinations.filter(
+  const filteredDestinations = processedDestinations.filter(
     (destination) =>
       destination.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       destination.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -94,42 +110,61 @@ const DestinationSelector = ({ destinations, onSelectDestination }) => {
                 "&:hover": {
                   transform: "scale(1.02)",
                 },
+                bgcolor: "#333333",
+                color: "white",
               }}
             >
-              <CardMedia
-                component="img"
-                height="140"
-                image={
-                  destination.image ||
-                  `/maps/destinations/${destination.id}.jpg`
-                }
-                alt={destination.name}
-              />
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box
+                sx={{
+                  p: 2,
+                  display: "flex",
+                  justifyContent: "center",
+                  bgcolor: "#333333",
+                }}
+              >
+                <Avatar
+                  sx={{
+                    width: 60,
+                    height: 60,
+                    bgcolor: getAvatarBgColor(destination.category),
+                  }}
+                >
                   {getCategoryIcon(destination.category)}
-                  <Typography variant="h6" component="div" sx={{ ml: 1 }}>
-                    {destination.name}
-                  </Typography>
-                </Box>
+                </Avatar>
+              </Box>
+
+              <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+                <Typography
+                  variant="h6"
+                  component="div"
+                  sx={{ mb: 1, textAlign: "center", fontWeight: 500 }}
+                >
+                  {destination.name}
+                </Typography>
 
                 <Typography
                   variant="body2"
                   color="text.secondary"
-                  sx={{ mb: 1 }}
+                  sx={{ mb: 1, textAlign: "center", color: "#aaaaaa" }}
                 >
                   {destination.address}
                 </Typography>
 
-                <Chip
-                  label={destination.category}
-                  size="small"
-                  sx={{ mb: 2 }}
-                  color="primary"
-                  variant="outlined"
-                />
+                <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                  <Chip
+                    label={destination.category}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ bgcolor: "transparent" }}
+                  />
+                </Box>
 
-                <Typography variant="body2" paragraph>
+                <Typography
+                  variant="body2"
+                  paragraph
+                  sx={{ textAlign: "center", mb: 2, color: "#cccccc" }}
+                >
                   {destination.description}
                 </Typography>
 
@@ -137,8 +172,15 @@ const DestinationSelector = ({ destinations, onSelectDestination }) => {
                   variant="contained"
                   fullWidth
                   onClick={() => onSelectDestination(destination)}
+                  sx={{
+                    bgcolor: "#2196f3",
+                    fontWeight: "bold",
+                    "&:hover": {
+                      bgcolor: "#1976d2",
+                    },
+                  }}
                 >
-                  Go Here
+                  GO HERE
                 </Button>
               </CardContent>
             </Card>

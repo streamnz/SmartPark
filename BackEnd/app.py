@@ -226,12 +226,12 @@ def logout():
 
 @app.route('/api/vehicles', methods=['GET'])
 def get_vehicles():
-    """获取可用车辆类型"""
+    """Get available vehicle types"""
     vehicles = [
         {
             "id": "sedan",
-            "name": "小轿车",
-            "description": "标准四门轿车，适合城市驾驶",
+            "name": "Sedan",
+            "description": "Standard four-door sedan, suitable for city driving",
             "image": "/models/thumbnails/sedan.jpg",
             "width": 1.8,
             "length": 4.5,
@@ -241,7 +241,7 @@ def get_vehicles():
         {
             "id": "suv",
             "name": "SUV",
-            "description": "运动型多用途车，提供更多空间和通过性",
+            "description": "Sport Utility Vehicle, providing more space and clearance",
             "image": "/models/thumbnails/suv.jpg",
             "width": 1.9,
             "length": 4.7,
@@ -250,8 +250,8 @@ def get_vehicles():
         },
         {
             "id": "pickup",
-            "name": "皮卡车",
-            "description": "带有开放式货箱的卡车",
+            "name": "Pickup Truck",
+            "description": "Truck with an open-air cargo area",
             "image": "/models/thumbnails/pickup.jpg",
             "width": 2.0,
             "length": 5.3,
@@ -260,8 +260,8 @@ def get_vehicles():
         },
         {
             "id": "van",
-            "name": "小货车",
-            "description": "封闭式箱型车，适合运输货物",
+            "name": "Van",
+            "description": "Enclosed box-like vehicle suitable for transporting goods",
             "image": "/models/thumbnails/van.jpg",
             "width": 2.0,
             "length": 5.5,
@@ -270,8 +270,8 @@ def get_vehicles():
         },
         {
             "id": "truck",
-            "name": "大货车",
-            "description": "大型运输车辆，空间充足",
+            "name": "Truck",
+            "description": "Large transport vehicle with ample space",
             "image": "/models/thumbnails/truck.jpg",
             "width": 2.5,
             "length": 7.0,
@@ -280,8 +280,8 @@ def get_vehicles():
         },
         {
             "id": "rv",
-            "name": "房车",
-            "description": "可移动的居住空间，适合长途旅行",
+            "name": "RV",
+            "description": "Recreational Vehicle with living space, suitable for long journeys",
             "image": "/models/thumbnails/rv.jpg",
             "width": 2.3,
             "length": 6.8,

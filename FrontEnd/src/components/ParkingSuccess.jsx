@@ -1,3 +1,9 @@
+import React from 'react';
+import { Box, Typography, Paper, Button, Grid, Chip, Divider } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import LocalParkingIcon from "@mui/icons-material/LocalParking";
 
 const ParkingSuccess = ({
