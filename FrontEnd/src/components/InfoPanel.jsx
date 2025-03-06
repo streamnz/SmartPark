@@ -1,6 +1,6 @@
 import React from "react";
 import { Paper, Typography, Box, Divider } from "@mui/material";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
+// 修复大小写问题，确保路径与实际文件系统匹配
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import LocalParkingIcon from "@mui/icons-material/LocalParking";

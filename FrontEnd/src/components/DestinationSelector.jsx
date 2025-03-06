@@ -20,8 +20,12 @@ import RestaurantIcon from "@mui/icons-material/Restaurant";
 import ParkIcon from "@mui/icons-material/Park";
 import BeachAccessIcon from "@mui/icons-material/BeachAccess";
 import CasinoIcon from "@mui/icons-material/Casino";
+import { api } from "../services/api";
 
-const DestinationSelector = ({ destinations = [], onSelectDestination }) => {
+const DestinationSelector = ({
+  destinations = { data: [] },
+  onSelectDestination,
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [processedDestinations, setProcessedDestinations] = useState([]);
 
@@ -50,6 +54,7 @@ const DestinationSelector = ({ destinations = [], onSelectDestination }) => {
       "Parks/Attractions": <ParkIcon color="success" />,
       "Beach/Leisure": <BeachAccessIcon color="info" />,
       "Tourism/Entertainment": <CasinoIcon color="secondary" />,
+      Transport: <LocationOnIcon color="primary" />,
     };
 
     return categoryMap[category] || <LocationOnIcon color="primary" />;
@@ -69,21 +74,22 @@ const DestinationSelector = ({ destinations = [], onSelectDestination }) => {
     (destination) =>
       destination.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       destination.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      destination.address.toLowerCase().includes(searchTerm.toLowerCase())
+      (destination.address &&
+        destination.address.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
     <Box sx={{ py: 2 }}>
       <Typography variant="h5" gutterBottom align="center">
-        Choose Your Destination
+        选择您的目的地
       </Typography>
       <Typography variant="body1" gutterBottom align="center" sx={{ mb: 2 }}>
-        Select where you want to go in Auckland City
+        在奥克兰市选择您想要前往的地点
       </Typography>
 
       <Box sx={{ mb: 4, display: "flex", justifyContent: "center" }}>
         <TextField
-          label="Search Destinations"
+          label="搜索目的地"
           variant="outlined"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -180,7 +186,7 @@ const DestinationSelector = ({ destinations = [], onSelectDestination }) => {
                     },
                   }}
                 >
-                  GO HERE
+                  前往此处
                 </Button>
               </CardContent>
             </Card>
