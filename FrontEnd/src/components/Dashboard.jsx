@@ -288,6 +288,7 @@ function Dashboard() {
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
+      mapId: "5a8d875e3485586f",
       styles: [
         {
           featureType: "all",
@@ -344,7 +345,7 @@ function Dashboard() {
         const apiKey =
           import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
           "AIzaSyB9g1LcaQTtNj0xQIHqugH_zfFCndrxbBw";
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker`;
         script.async = true;
         script.defer = true;
         script.onload = initializeMap;

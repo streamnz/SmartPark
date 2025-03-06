@@ -108,6 +108,7 @@ function DestinationSelector({ destinations, onSelectDestination }) {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
+        mapId: "5a8d875e3485586f",
         styles: [
           {
             featureType: "all",

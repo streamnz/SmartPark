@@ -142,7 +142,8 @@ export const loadGoogleMapsApi = () => {
     const apiKey = getApiKey();
     console.log(`使用API密钥: ${apiKey.substring(0, 8)}...`); // 仅输出密钥前缀，保护安全
 
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&callback=${callbackName}&v=beta`;
+    // 确保明确请求places库和marker库，并添加地图ID
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&callback=${callbackName}&v=beta&map_ids=5a8d875e3485586f`;
     script.async = true;
     script.defer = true;
 
