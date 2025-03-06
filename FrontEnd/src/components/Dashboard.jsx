@@ -234,16 +234,52 @@ function Dashboard() {
           directionsRendererRef.current.setMap(null);
         }
 
-        const decodePath = google.maps.geometry.encoding.decodePath(
-          routeData.encodedPolyline
-        );
+        if (
+          !window.google ||
+          !window.google.maps ||
+          !window.google.maps.geometry ||
+          !window.google.maps.geometry.encoding
+        ) {
+          console.warn("Google Maps Geometry库不可用，无法解码路线");
 
-        const routePolyline = new google.maps.Polyline({
-          path: decodePath,
-          strokeColor: "#4fc3f7",
-          strokeWeight: 5,
-          strokeOpacity: 0.8,
-        });
+          const simplePath = [
+            new google.maps.LatLng(origin.lat, origin.lng),
+            new google.maps.LatLng(destination.lat, destination.lng),
+          ];
+
+          const routePolyline = new google.maps.Polyline({
+            path: simplePath,
+            strokeColor: "#4fc3f7",
+            strokeWeight: 5,
+            strokeOpacity: 0.8,
+          });
+
+          routePolyline.setMap(googleMapsRef.current);
+
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend(new google.maps.LatLng(origin.lat, origin.lng));
+          bounds.extend(
+            new google.maps.LatLng(destination.lat, destination.lng)
+          );
+          googleMapsRef.current.fitBounds(bounds);
+        } else {
+          const decodePath = google.maps.geometry.encoding.decodePath(
+            routeData.encodedPolyline
+          );
+
+          const routePolyline = new google.maps.Polyline({
+            path: decodePath,
+            strokeColor: "#4fc3f7",
+            strokeWeight: 5,
+            strokeOpacity: 0.8,
+          });
+
+          const bounds = new google.maps.LatLngBounds();
+          decodePath.forEach((point) => bounds.extend(point));
+          googleMapsRef.current.fitBounds(bounds);
+
+          routePolyline.setMap(googleMapsRef.current);
+        }
 
         const originMarker = new google.maps.Marker({
           position: origin,
@@ -262,12 +298,6 @@ function Dashboard() {
             url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
           },
         });
-
-        routePolyline.setMap(googleMapsRef.current);
-
-        const bounds = new google.maps.LatLngBounds();
-        decodePath.forEach((point) => bounds.extend(point));
-        googleMapsRef.current.fitBounds(bounds);
       }
     } catch (error) {
       console.error("Error calculating route:", error);
@@ -345,7 +375,7 @@ function Dashboard() {
         const apiKey =
           import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
           "AIzaSyB9g1LcaQTtNj0xQIHqugH_zfFCndrxbBw";
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&map_ids=5a8d875e3485586f`;
         script.async = true;
         script.defer = true;
         script.onload = initializeMap;
