@@ -1,22 +1,27 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [
-    react({
-      // 启用自动 JSX 运行时
-      jsxRuntime: "automatic",
-      // 无需显式导入 React
-      jsxImportSource: "react",
-    }),
-  ],
-  server: {
-    proxy: {
-      "/api": {
-        target: "http://localhost:5001",
-        changeOrigin: true,
-      },
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => {
+  // 加载环境变量
+  const env = loadEnv(mode, process.cwd());
+
+  console.log("Loading environment variables...");
+  console.log(
+    "VITE_GOOGLE_MAPS_API_KEY exists:",
+    !!env.VITE_GOOGLE_MAPS_API_KEY
+  );
+
+  return {
+    plugins: [react()],
+    server: {
+      port: 5173,
     },
-  },
+    define: {
+      // 确保环境变量可用
+      "process.env.VITE_GOOGLE_MAPS_API_KEY": JSON.stringify(
+        env.VITE_GOOGLE_MAPS_API_KEY
+      ),
+    },
+  };
 });
