@@ -1,6 +1,4 @@
-import DirectionsIcon from "@mui/icons-material/Directions";
 import InfoIcon from "@mui/icons-material/Info";
-import NavigationIcon from "@mui/icons-material/Navigation";
 
 const ParkingConsole = ({
   recommendedSpot,

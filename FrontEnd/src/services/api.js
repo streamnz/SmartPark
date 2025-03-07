@@ -10,7 +10,37 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 10000, // 请求超时时间
 });
+
+// 请求拦截器 - 添加认证令牌
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 响应拦截器 - 处理错误
+apiClient.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // 处理401错误 - 身份验证失败
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem("accessToken");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const api = {
   // 获取车辆列表
@@ -160,9 +190,7 @@ export const api = {
   // 获取附近停车场
   getNearbyParkings: async (destination) => {
     try {
-      const response = await apiClient.get(
-        `/nearby-parkings/${destination.id}`
-      );
+      const response = await apiClient.get(`/nearby-parkings/${destination.id}`);
       return response.data.data;
     } catch (error) {
       console.error("Error fetching nearby parkings:", error);
@@ -223,16 +251,8 @@ export const api = {
 
       // 生成停车位
       const spots = {};
-      const spotTypes = [
-        "standard",
-        "compact",
-        "large",
-        "disabled",
-        "ev_charging",
-      ];
-      const occupiedSpotsCount = Math.floor(
-        Math.random() * (rows * cols * 0.7)
-      ); // 最大70%占用率
+      const spotTypes = ["standard", "compact", "large", "disabled", "ev_charging"];
+      const occupiedSpotsCount = Math.floor(Math.random() * (rows * cols * 0.7)); // 最大70%占用率
       const occupiedSpots = new Set();
 
       // 生成随机占用的停车位
@@ -247,8 +267,7 @@ export const api = {
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const spotId = `${String.fromCharCode(65 + row)}${col + 1}`;
-          const spotType =
-            spotTypes[Math.floor(Math.random() * spotTypes.length)];
+          const spotType = spotTypes[Math.floor(Math.random() * spotTypes.length)];
 
           spots[spotId] = {
             id: spotId,
@@ -256,12 +275,7 @@ export const api = {
             col: col,
             is_occupied: occupiedSpots.has(spotId),
             type: spotType,
-            size:
-              spotType === "compact"
-                ? [2, 4]
-                : spotType === "large"
-                ? [3, 6]
-                : [2.5, 5],
+            size: spotType === "compact" ? [2, 4] : spotType === "large" ? [3, 6] : [2.5, 5],
           };
         }
       }
@@ -286,37 +300,33 @@ export const api = {
       });
 
       // 寻找可用停车位
-      const availableSpots = Object.values(spots).filter(
-        (spot) => !spot.is_occupied
-      );
+      const availableSpots = Object.values(spots).filter((spot) => !spot.is_occupied);
 
       // 根据机器学习算法推荐最佳停车位
       // 实际项目中，这应该在后端基于多个因素计算
       let recommendedSpot = null;
       if (availableSpots.length > 0) {
-        recommendedSpot =
-          availableSpots[Math.floor(Math.random() * availableSpots.length)];
+        recommendedSpot = availableSpots[Math.floor(Math.random() * availableSpots.length)];
       }
 
-      const aiReasoning = `Based on your ${
-        parkingId.includes("Premium") ? "premium" : "standard"
-      } vehicle type and current parking availability, spot ${
-        recommendedSpot?.id || "None"
-      } is recommended. This location offers optimal distance to exit and suitable dimensions for your vehicle.`;
+      const aiReasoning = `基于您的${
+        parkingId.includes("Premium") ? "高级" : "标准"
+      }车型和当前停车位可用情况，推荐您使用${
+        recommendedSpot?.id || "无"
+      }号车位。该位置到出口距离最佳，且尺寸适合您的车辆。`;
 
       // 导航指令
       const navigationInstructions = [
-        "Enter parking lot from the main entrance",
-        `Drive to level 1, ${
-          recommendedSpot ? recommendedSpot.row + 1 : ""
-        } row`,
-        `Look for spot ${recommendedSpot?.id || ""}`,
-        "Park carefully within the lines",
+        "从正门进入停车场",
+        `驶向第1层，${recommendedSpot ? recommendedSpot.row + 1 : ""}排`,
+        `寻找${recommendedSpot?.id || ""}号车位`,
+        "请在线内小心停车",
       ];
 
+      // 直接返回对象结构，而不是包装在data字段中
       return {
         id: parkingId,
-        name: `${parkingId} Parking Lot`,
+        name: `${parkingId} 停车场`,
         total_spots: rows * cols,
         available_spots: rows * cols - occupiedSpotsCount,
         spots: spots,
@@ -327,95 +337,54 @@ export const api = {
     }
   },
 
-  // 获取停车推荐
-  getParkingRecommendation: async (parkingId, vehicleType) => {
+  // 获取AI推荐
+  getAiRecommendation: async (data) => {
     try {
-      const response = await apiClient.post(
-        `/parking-recommendation/${parkingId}`,
-        {
-          vehicle_type: vehicleType,
+      // 实际项目中，这里应该调用后端 API
+      // const response = await apiClient.post('/parking/recommendation', data);
+      // return response.data;
+      
+      // 模拟 API 响应
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 创建一个模拟数据对象
+      const mockRecommendation = {
+        data: {
+          id: "spot1",
+          name: "智能推荐停车场",
+          location: {
+            lat: data.destination.location.lat + 0.001,
+            lng: data.destination.location.lng - 0.0015,
+          },
+          price: "¥4/小时",
+          availableSpots: 5,
+          distance: "距入口120米",
+          isCovered: true,
+          security: "24小时监控",
+          rating: 4.5,
+          isRecommended: true,
+          aiReason: "根据您的低成本和靠近入口的偏好，这是最佳选择"
         }
-      );
-      return response.data.data;
-    } catch (error) {
-      console.error("Error fetching parking recommendation:", error);
-
-      // 重用停车场详情获取的逻辑
-      const parkingLot = await api.getParkingLotDetails(parkingId);
-
-      return {
-        status: "success",
-        spot: parkingLot.recommended_spot,
-        reasoning: parkingLot.ai_reasoning,
-        navigation_instructions: parkingLot.navigation_instructions,
       };
-    }
-  },
-
-  // 请求重新路由
-  requestReroute: async (parkingId, currentPosition, recommendedSpot) => {
-    try {
-      const response = await apiClient.post(`/reroute/${parkingId}`, {
-        current_position: currentPosition,
-        recommended_spot: recommendedSpot,
-      });
-      return response.data.data;
+      
+      return mockRecommendation;
     } catch (error) {
-      console.error("Error rerouting:", error);
-
-      // 使用备用模拟数据
-      // 获取停车场数据
-      const parkingLot = await api.getParkingLotDetails(parkingId);
-
-      // 查找可用停车位
-      const availableSpots = Object.values(parkingLot.spots).filter(
-        (spot) => !spot.is_occupied && spot.id !== recommendedSpot.id
-      );
-
-      // 转换当前位置到行和列
-      const currentRow = Math.round(currentPosition.y);
-      const currentCol = Math.round(currentPosition.x);
-
-      // 按到当前位置的距离排序
-      const sortedSpots = [...availableSpots].sort((a, b) => {
-        const distA =
-          Math.abs(a.row - currentRow) + Math.abs(a.col - currentCol);
-        const distB =
-          Math.abs(b.row - currentRow) + Math.abs(b.col - currentCol);
-        return distA - distB;
-      });
-
-      // 选择最近的停车位
-      const recommendation = {
-        status: "success",
-        spot: sortedSpots[0],
-        reasoning:
-          "Based on your current position, a new parking spot has been recommended",
-        navigation_instructions: [
-          "From your current position",
-          `Drive ${
-            sortedSpots[0].row > currentRow ? "forward" : "backward"
-          } ${Math.abs(sortedSpots[0].row - currentRow)} rows`,
-          `Drive ${
-            sortedSpots[0].col > currentCol ? "right" : "left"
-          } ${Math.abs(sortedSpots[0].col - currentCol)} columns`,
-          `This is your spot ${sortedSpots[0].id}`,
-        ],
-      };
-
-      return recommendation;
+      console.error("AI推荐调用失败:", error);
+      throw error;
     }
   },
+  
+  // 认证相关
+  login: (credentials) => apiClient.post("/auth/login", credentials),
+  register: (userData) => apiClient.post("/auth/register", userData),
+  logout: () => apiClient.post("/auth/logout"),
+  refreshToken: () => apiClient.post("/auth/refresh-token"),
 
-  // 重置停车场
-  resetParkingLot: async (parkingId) => {
-    try {
-      const response = await apiClient.post(`/reset-parking-lot/${parkingId}`);
-      return response.data;
-    } catch (error) {
-      console.error("Error resetting parking lot:", error);
-      // 不需要特殊的本地处理，因为数据会在每次获取时重新生成
-      return { status: "success", message: "Parking lot has been reset" };
-    }
-  },
+  // 用户相关
+  getUserProfile: () => apiClient.get("/users/profile"),
+  updateUserProfile: (data) => apiClient.put("/users/profile", data),
+  
+  // 其他API方法可以根据需求添加
 };
+
+export default api;
