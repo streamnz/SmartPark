@@ -1005,7 +1005,7 @@ function Dashboard() {
               <Box sx={{ mb: 2, mt: 2 }}>
                 <Typography variant="subtitle1">Navigation Info</Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  From: Auckland City Center
+                  From: Your Location
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
                   To: {selectedDestination.name}
