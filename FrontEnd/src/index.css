@@ -27,6 +27,21 @@ body {
   overflow: hidden;
 }
 
+/* 自定义地图控件位置样式 */
+/* 注意：我们移除了之前隐藏控件的CSS，现在添加定位CSS */
+.gmnoprint.gm-bundled-control,
+.gm-style-cc,
+.gm-svpc,
+.gm-fullscreen-control {
+  margin-left: 10px !important; /* 给控件添加一些左边距 */
+}
+
+/* 确保地图图例正确显示在左下角 */
+.MuiBox-root[data-legend="true"] {
+  left: 16px !important;
+  right: auto !important;
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

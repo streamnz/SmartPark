@@ -1447,59 +1447,6 @@ function Dashboard() {
         )}
       </Box>
 
-      {/* 地图图例仍然保留在右下角，但更精简 */}
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: navigationProgress !== "idle" ? 80 : 20,
-          right: 20,
-          backgroundColor: "rgba(32,33,36,0.75)",
-          backdropFilter: "blur(8px)",
-          borderRadius: 1.5,
-          p: 1.5,
-          zIndex: 2,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-        }}
-      >
-        <Typography
-          variant="caption"
-          gutterBottom
-          sx={{ fontWeight: 500, color: "white", display: "block" }}
-        >
-          Map Legend
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-          <Box
-            sx={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              bgcolor: "#4CAF50",
-              border: "2px solid white",
-              mr: 1,
-            }}
-          />
-          <Typography variant="caption" color="white">
-            Current Location
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <Box
-            sx={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              bgcolor: "#FF4136",
-              border: "2px solid white",
-              mr: 1,
-            }}
-          />
-          <Typography variant="caption" color="white">
-            Destination
-          </Typography>
-        </Box>
-      </Box>
-
       {/* 到达目的地对话框 */}
       {showArrivalDialog && (
         <Box
@@ -1565,6 +1512,82 @@ function Dashboard() {
           </Box>
         </Box>
       )}
+
+      {/* 地图图例 - 保持在左下角但样式优化 */}
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: navigationProgress !== "idle" ? 80 : 24, // 当有底部导航栏时，距离底部80px，否则24px
+          left: 24,
+          bgcolor: "rgba(32, 33, 36, 0.85)",
+          backdropFilter: "blur(8px)",
+          borderRadius: 2,
+          p: 2,
+          zIndex: 4,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          minWidth: "180px",
+        }}
+      >
+        <Typography
+          variant="subtitle2"
+          fontWeight="bold"
+          sx={{
+            mb: 1.5,
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <PlaceIcon sx={{ fontSize: 18 }} />
+          Map Legend
+        </Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                bgcolor: "#4CAF50",
+                border: "2px solid rgba(255,255,255,0.8)",
+                boxShadow: "0 0 4px rgba(0,0,0,0.2)",
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                color: "rgba(255,255,255,0.9)",
+                fontWeight: 400,
+              }}
+            >
+              Current Location
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                bgcolor: "#F44336",
+                border: "2px solid rgba(255,255,255,0.8)",
+                boxShadow: "0 0 4px rgba(0,0,0,0.2)",
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                color: "rgba(255,255,255,0.9)",
+                fontWeight: 400,
+              }}
+            >
+              Destination
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
     </Box>
   );
 }

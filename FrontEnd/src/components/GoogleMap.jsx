@@ -115,13 +115,28 @@ const GoogleMap = ({
         center: center,
         zoom: 14,
         mapId: "5a8d875e3485586f",
-        disableDefaultUI: true,
-        zoomControl: true,
-        mapTypeControl: false,
-        scaleControl: true,
-        streetViewControl: false,
-        rotateControl: false,
-        fullscreenControl: true,
+        disableDefaultUI: false, // 启用默认UI
+        zoomControl: true, // 启用缩放控制
+        zoomControlOptions: {
+          position: window.google?.maps?.ControlPosition?.LEFT_BOTTOM, // 放在左下角
+        },
+        mapTypeControl: true, // 启用地图类型控制
+        mapTypeControlOptions: {
+          position: window.google?.maps?.ControlPosition?.LEFT_BOTTOM, // 放在左下角
+        },
+        scaleControl: true, // 启用比例尺控制
+        streetViewControl: true, // 启用街景控制
+        streetViewControlOptions: {
+          position: window.google?.maps?.ControlPosition?.LEFT_BOTTOM, // 放在左下角
+        },
+        rotateControl: true, // 启用旋转控制
+        rotateControlOptions: {
+          position: window.google?.maps?.ControlPosition?.LEFT_BOTTOM, // 放在左下角
+        },
+        fullscreenControl: true, // 启用全屏控制
+        fullscreenControlOptions: {
+          position: window.google?.maps?.ControlPosition?.LEFT_BOTTOM, // 放在左下角
+        },
         styles: [
           {
             featureType: "all",
@@ -167,6 +182,38 @@ const GoogleMap = ({
       // 创建地图
       const map = new window.google.maps.Map(mapRef.current, options);
       mapInstanceRef.current = map;
+
+      // 隐藏Google地图右下角的版权和地图数据信息
+      try {
+        // 等待地图完全加载
+        google.maps.event.addListenerOnce(map, "idle", () => {
+          // 查找并隐藏右下角的信息面板
+          const mapDiv = mapRef.current;
+          if (mapDiv) {
+            // 隐藏版权文本
+            const copyrightControls = mapDiv.querySelectorAll(
+              ".gmnoprint, .gm-style-cc"
+            );
+            copyrightControls.forEach((element) => {
+              element.style.display = "none";
+            });
+
+            // 也可以尝试通过CSS添加样式隐藏
+            const style = document.createElement("style");
+            style.type = "text/css";
+            style.innerHTML = `
+              .gm-style-cc { display: none !important; }
+              .gmnoprint { display: none !important; }
+              .gm-style .gmnoscreen { display: none !important; }
+              .gm-style-moc { display: none !important; }
+              .gm-control-active { display: none !important; }
+            `;
+            document.head.appendChild(style);
+          }
+        });
+      } catch (error) {
+        console.error("隐藏地图控件时出错:", error);
+      }
 
       // 通知父组件地图已准备就绪
       if (onMapReady) {
@@ -241,7 +288,7 @@ const GoogleMap = ({
       destinationMarkerRef.current = new window.google.maps.Marker({
         position: position,
         map: mapInstanceRef.current,
-        title: "目的地",
+        title: "Destination",
         animation: window.google.maps.Animation.DROP,
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
@@ -514,7 +561,7 @@ const GoogleMap = ({
       originMarkerRef.current = new window.google.maps.Marker({
         position: origin,
         map: mapInstanceRef.current,
-        title: "起点",
+        title: "Start",
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           fillColor: "#4CAF50",
@@ -532,7 +579,7 @@ const GoogleMap = ({
       destinationMarkerRef.current = new window.google.maps.Marker({
         position: destination,
         map: mapInstanceRef.current,
-        title: "目的地",
+        title: "Destination",
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           fillColor: "#F44336",
@@ -611,7 +658,7 @@ const GoogleMap = ({
       originMarkerRef.current = new window.google.maps.Marker({
         position: position,
         map: mapInstanceRef.current,
-        title: "当前位置",
+        title: "Current Location",
         animation: window.google.maps.Animation.DROP,
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
@@ -1023,57 +1070,6 @@ const GoogleMap = ({
           width: "100%",
         }}
       />
-
-      {/* 地图图例 */}
-      {!loading && !error && mapsApiLoaded && (
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: 16,
-            right: 16,
-            bgcolor: "rgba(0,0,0,0.7)",
-            borderRadius: 1,
-            p: 1.5,
-            zIndex: 4,
-          }}
-        >
-          <Typography
-            variant="subtitle2"
-            fontWeight="bold"
-            sx={{ mb: 1, color: "white" }}
-          >
-            地图图例
-          </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-            <Box
-              sx={{
-                width: 12,
-                height: 12,
-                borderRadius: "50%",
-                bgcolor: "#4CAF50",
-                mr: 1,
-              }}
-            />
-            <Typography variant="caption" color="white">
-              起点
-            </Typography>
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Box
-              sx={{
-                width: 12,
-                height: 12,
-                borderRadius: "50%",
-                bgcolor: "#F44336",
-                mr: 1,
-              }}
-            />
-            <Typography variant="caption" color="white">
-              目的地
-            </Typography>
-          </Box>
-        </Box>
-      )}
     </Box>
   );
 };
