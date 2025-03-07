@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 from utils.ai_service import get_ai_recommendation, reroute_recommendation
 from parking_data import parking_lots, get_auckland_destinations
 import random
+import json
 
 # 加载环境变量
 load_dotenv()

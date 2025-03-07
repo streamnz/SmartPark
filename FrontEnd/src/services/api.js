@@ -1,12 +1,35 @@
 // FrontEnd/src/services/api.js
 import axios from "axios";
 
+// 获取API基础URL - 根据环境不同使用不同的URL
+const getBaseUrl = () => {
+  // 检查是否处于生产环境
+  const isProduction = import.meta.env.MODE === "production";
+
+  // 从环境变量获取API URL（如果配置了的话）
+  const envApiUrl = import.meta.env.VITE_API_URL;
+
+  if (envApiUrl) {
+    return envApiUrl;
+  }
+
+  // 根据环境返回不同的基础URL
+  if (isProduction) {
+    return "https://smartparking-api.streamnz.com";
+  } else {
+    // 开发环境：使用本地后端端口
+    return "http://localhost:5001";
+  }
+};
+
 // API基础URL - 在生产环境应更新为实际后端URL
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
+const BASE_URL = getBaseUrl();
+
+console.log(`API服务使用基础URL: ${BASE_URL}`);
 
 // 创建API客户端
 const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: BASE_URL + "/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -190,7 +213,9 @@ export const api = {
   // 获取附近停车场
   getNearbyParkings: async (destination) => {
     try {
-      const response = await apiClient.get(`/nearby-parkings/${destination.id}`);
+      const response = await apiClient.get(
+        `/nearby-parkings/${destination.id}`
+      );
       return response.data.data;
     } catch (error) {
       console.error("Error fetching nearby parkings:", error);
@@ -251,8 +276,16 @@ export const api = {
 
       // 生成停车位
       const spots = {};
-      const spotTypes = ["standard", "compact", "large", "disabled", "ev_charging"];
-      const occupiedSpotsCount = Math.floor(Math.random() * (rows * cols * 0.7)); // 最大70%占用率
+      const spotTypes = [
+        "standard",
+        "compact",
+        "large",
+        "disabled",
+        "ev_charging",
+      ];
+      const occupiedSpotsCount = Math.floor(
+        Math.random() * (rows * cols * 0.7)
+      ); // 最大70%占用率
       const occupiedSpots = new Set();
 
       // 生成随机占用的停车位
@@ -267,7 +300,8 @@ export const api = {
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const spotId = `${String.fromCharCode(65 + row)}${col + 1}`;
-          const spotType = spotTypes[Math.floor(Math.random() * spotTypes.length)];
+          const spotType =
+            spotTypes[Math.floor(Math.random() * spotTypes.length)];
 
           spots[spotId] = {
             id: spotId,
@@ -275,7 +309,12 @@ export const api = {
             col: col,
             is_occupied: occupiedSpots.has(spotId),
             type: spotType,
-            size: spotType === "compact" ? [2, 4] : spotType === "large" ? [3, 6] : [2.5, 5],
+            size:
+              spotType === "compact"
+                ? [2, 4]
+                : spotType === "large"
+                ? [3, 6]
+                : [2.5, 5],
           };
         }
       }
@@ -300,13 +339,16 @@ export const api = {
       });
 
       // 寻找可用停车位
-      const availableSpots = Object.values(spots).filter((spot) => !spot.is_occupied);
+      const availableSpots = Object.values(spots).filter(
+        (spot) => !spot.is_occupied
+      );
 
       // 根据机器学习算法推荐最佳停车位
       // 实际项目中，这应该在后端基于多个因素计算
       let recommendedSpot = null;
       if (availableSpots.length > 0) {
-        recommendedSpot = availableSpots[Math.floor(Math.random() * availableSpots.length)];
+        recommendedSpot =
+          availableSpots[Math.floor(Math.random() * availableSpots.length)];
       }
 
       const aiReasoning = `基于您的${
@@ -343,10 +385,10 @@ export const api = {
       // 实际项目中，这里应该调用后端 API
       // const response = await apiClient.post('/parking/recommendation', data);
       // return response.data;
-      
+
       // 模拟 API 响应
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // 创建一个模拟数据对象
       const mockRecommendation = {
         data: {
@@ -363,17 +405,17 @@ export const api = {
           security: "24小时监控",
           rating: 4.5,
           isRecommended: true,
-          aiReason: "根据您的低成本和靠近入口的偏好，这是最佳选择"
-        }
+          aiReason: "根据您的低成本和靠近入口的偏好，这是最佳选择",
+        },
       };
-      
+
       return mockRecommendation;
     } catch (error) {
       console.error("AI推荐调用失败:", error);
       throw error;
     }
   },
-  
+
   // 认证相关
   login: (credentials) => apiClient.post("/auth/login", credentials),
   register: (userData) => apiClient.post("/auth/register", userData),
@@ -383,7 +425,7 @@ export const api = {
   // 用户相关
   getUserProfile: () => apiClient.get("/users/profile"),
   updateUserProfile: (data) => apiClient.put("/users/profile", data),
-  
+
   // 其他API方法可以根据需求添加
 };
 

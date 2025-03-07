@@ -9,6 +9,10 @@ let placesService = null;
 let autocompleteService = null;
 let mapsDiv = null;
 
+// Track API loading state
+let isApiLoading = false;
+let apiLoadingPromise = null;
+
 // 从环境变量或硬编码获取API密钥
 const getApiKey = () => {
   // 优先使用环境变量中的密钥
@@ -73,87 +77,139 @@ const getMockSearchResults = (query) => {
 };
 
 /**
- * 加载Google Maps API脚本
- * @returns {Promise} 加载完成的Promise
+ * Load Google Maps API with all required libraries
+ * @returns {Promise} - Promise that resolves when API is loaded
  */
-export const loadGoogleMapsApi = () => {
-  return new Promise((resolve, reject) => {
-    // 如果API已加载，直接返回
-    if (isApiLoaded && window.google && window.google.maps) {
-      console.log("Google Maps API已加载，复用现有实例");
-      initServices();
-      resolve(window.google.maps);
+const loadGoogleMapsApi = () => {
+  // If we already have a promise in progress, return it
+  if (apiLoadingPromise) {
+    return apiLoadingPromise;
+  }
+
+  // If API is already loaded, return resolved promise
+  if (window.google && window.google.maps && window.google.maps.places) {
+    console.log("Google Maps API already loaded");
+    return Promise.resolve(window.google.maps);
+  }
+
+  // Create new loading promise
+  apiLoadingPromise = new Promise((resolve, reject) => {
+    // Set loading flag
+    isApiLoading = true;
+
+    // Check if script already exists
+    const existingScript = document.getElementById("google-maps-script");
+    if (existingScript) {
+      console.log("Google Maps script already exists, waiting for it to load");
+
+      // Set up interval to check for API loading completion
+      const checkInterval = setInterval(() => {
+        if (window.google && window.google.maps && window.google.maps.places) {
+          clearInterval(checkInterval);
+          clearTimeout(timeout);
+          console.log("Google Maps API loaded successfully (existing script)");
+          isApiLoading = false;
+          resolve(window.google.maps);
+        }
+      }, 100);
+
+      // Set timeout to avoid waiting forever
+      const timeout = setTimeout(() => {
+        clearInterval(checkInterval);
+        isApiLoading = false;
+        apiLoadingPromise = null;
+        reject(new Error("Google Maps API loading timeout"));
+      }, 15000);
+
       return;
     }
 
-    // 避免重复加载
-    if (
-      document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')
-    ) {
-      console.log("Google Maps API脚本已存在，等待加载完成");
+    // Create script element
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
 
-      // 检查是否已经加载完成
-      if (window.google && window.google.maps) {
-        console.log("Google Maps API已加载完成");
-        isApiLoaded = true;
-        initServices();
-        resolve(window.google.maps);
-      } else {
-        // 轮询检查直到API加载完成
-        const checkGoogleMaps = setInterval(() => {
-          if (window.google && window.google.maps) {
-            clearInterval(checkGoogleMaps);
-            console.log("Google Maps API现已加载完成");
-            isApiLoaded = true;
-            initServices();
-            resolve(window.google.maps);
-          }
-        }, 100);
+    // Get API key from environment variables
+    const apiKey =
+      import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+      "AIzaSyB9g1LcaQTtNj0xQIHqugH_zfFCndrxbBw";
 
-        // 设置超时
-        setTimeout(() => {
-          clearInterval(checkGoogleMaps);
-          reject(new Error("Google Maps API加载超时"));
-        }, 10000);
-      }
-      return;
-    }
-
-    console.log("开始加载Google Maps API...");
-
-    // 创建回调函数
-    const callbackName = `initGoogleMaps_${Date.now()}`;
+    // Define callback function
+    const callbackName = `googleMapsCallback_${Date.now()}`;
     window[callbackName] = () => {
-      console.log("Google Maps API回调函数被调用");
-      if (window.google && window.google.maps) {
-        console.log("Google Maps API加载成功！");
-        isApiLoaded = true;
-        initServices();
+      console.log("Google Maps callback executed");
+      if (window.google && window.google.maps && window.google.maps.places) {
+        isApiLoading = false;
+        delete window[callbackName];
         resolve(window.google.maps);
       } else {
-        console.error("Google Maps API加载回调被触发，但google.maps对象不存在");
-        reject(new Error("Google Maps API加载异常"));
+        console.error("Google Maps callback executed but API not available");
+        setTimeout(() => {
+          if (
+            window.google &&
+            window.google.maps &&
+            window.google.maps.places
+          ) {
+            isApiLoading = false;
+            delete window[callbackName];
+            resolve(window.google.maps);
+          } else {
+            isApiLoading = false;
+            apiLoadingPromise = null;
+            delete window[callbackName];
+            reject(new Error("Google Maps API failed to initialize properly"));
+          }
+        }, 1000); // Give it a second chance
       }
-      delete window[callbackName];
     };
 
-    // 创建script标签
-    const script = document.createElement("script");
-    const apiKey = getApiKey();
-    console.log(`使用API密钥: ${apiKey.substring(0, 8)}...`); // 仅输出密钥前缀，保护安全
-
-    // 确保明确请求places库和marker库，并添加地图ID
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&callback=${callbackName}&v=beta&map_ids=5a8d875e3485586f`;
+    // Set script attributes - explicitly include places library
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&callback=${callbackName}&v=weekly`;
     script.async = true;
     script.defer = true;
 
-    script.onerror = (e) => {
-      console.error("Google Maps API脚本加载失败:", e);
-      reject(new Error("Google Maps API脚本加载失败，请检查网络和API密钥"));
+    // Handle script loading errors
+    script.onerror = (error) => {
+      console.error("Error loading Google Maps script:", error);
+      isApiLoading = false;
+      apiLoadingPromise = null;
+      delete window[callbackName];
+      reject(new Error("Failed to load Google Maps script"));
     };
 
+    // Set timeout to handle cases where callback isn't called
+    const timeout = setTimeout(() => {
+      if (isApiLoading) {
+        console.error("Google Maps script loading timeout");
+        isApiLoading = false;
+        apiLoadingPromise = null;
+        delete window[callbackName];
+        reject(new Error("Google Maps API loading timeout"));
+      }
+    }, 15000);
+
+    // Add script to head
     document.head.appendChild(script);
   });
+
+  // Handle promise completion to reset loading state
+  apiLoadingPromise.catch(() => {
+    apiLoadingPromise = null;
+  });
+
+  return apiLoadingPromise;
+};
+
+/**
+ * 确保Google Maps API加载后才执行操作
+ * @returns {Promise} 加载完成的Promise
+ */
+export const ensureApiLoaded = async () => {
+  try {
+    return await loadGoogleMapsApi();
+  } catch (error) {
+    console.error("加载Google Maps API失败:", error);
+    throw error;
+  }
 };
 
 /**
@@ -215,168 +271,177 @@ export const initMapsService = async () => {
 };
 
 /**
- * 搜索地点并获取建议
- * @param {string} query 搜索查询文本
- * @returns {Promise} 搜索结果Promise
+ * Search for places using the Google Places API
+ * @param {string} query - Search query
+ * @returns {Promise<Array>} - Array of search results
  */
-export const searchPlaces = async (query) => {
-  console.log(`开始搜索地点: "${query}"`);
-
-  // 如果查询为空，返回空结果
+const searchPlaces = async (query) => {
   if (!query || query.trim() === "") {
-    console.log("查询为空，返回空结果");
     return [];
   }
 
   try {
-    // 确保API已加载
-    if (!isApiLoaded || !autocompleteService) {
-      console.log("尝试加载 Google Maps API...");
-      try {
-        await loadGoogleMapsApi();
-      } catch (err) {
-        console.error("加载 Google Maps API 失败:", err);
-        return getMockSearchResults(query); // 使用模拟数据作为备用
-      }
-    }
+    // Ensure API is loaded
+    await ensureApiLoaded();
 
-    // 二次检查 autocompleteService
-    if (!autocompleteService) {
-      console.warn("AutocompleteService 仍不可用，使用模拟数据");
+    // Double-check Places API exists
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      console.error("Places API not available despite load success");
       return getMockSearchResults(query);
     }
 
-    // 使用 AutocompleteService 进行搜索
-    return new Promise((resolve) => {
-      console.log("调用 AutocompleteService.getPlacePredictions...");
+    // Create AutocompleteService instance
+    const autocompleteService =
+      new window.google.maps.places.AutocompleteService();
 
+    // Return promise for results
+    return new Promise((resolve) => {
       autocompleteService.getPlacePredictions(
         {
           input: query,
-          componentRestrictions: { country: "nz" }, // 限制在新西兰
+          componentRestrictions: { country: "nz" },
         },
-        (predictions, status) => {
-          console.log(`AutocompleteService 返回状态: ${status}`);
-
-          // 如果 API 调用成功并返回结果
+        (results, status) => {
           if (
             status === window.google.maps.places.PlacesServiceStatus.OK &&
-            predictions &&
-            predictions.length > 0
+            results
           ) {
-            console.log(`成功找到 ${predictions.length} 个搜索结果`);
-            resolve(predictions);
+            resolve(results);
           } else {
-            console.warn(`API 未返回结果或出错。状态: ${status}，使用模拟数据`);
+            console.warn(`Places search failed with status: ${status}`);
             resolve(getMockSearchResults(query));
           }
         }
       );
     });
   } catch (error) {
-    console.error("搜索地点时发生错误:", error);
-    return getMockSearchResults(query); // 使用模拟数据作为后备
+    console.error("Error in searchPlaces:", error);
+    return getMockSearchResults(query);
   }
 };
 
 /**
- * 获取地点详情
- * @param {string} placeId 地点ID
- * @returns {Promise} 地点详情Promise
+ * Get place details using Google Places API
+ * @param {string} placeId - Google Place ID
+ * @returns {Promise<Object>} - Place details
  */
-export const getPlaceDetails = async (placeId) => {
-  // 如果 placeId 以 "mock_" 开头，返回模拟数据
-  if (placeId && placeId.startsWith("mock_")) {
-    console.log("使用模拟地点详情数据");
+const getPlaceDetails = async (placeId) => {
+  console.log(`获取地点详情，placeId: ${placeId}`);
+
+  // Return mock data for mock places
+  if (placeId && placeId.startsWith("mock_place")) {
     return {
-      name: "模拟地点 " + placeId,
-      formatted_address: "123 Sample Street, Auckland, New Zealand",
-      geometry: {
-        location: {
-          lat: () => -36.8508,
-          lng: () => 174.7645,
-        },
-      },
-      types: ["point_of_interest"],
+      id: placeId,
+      name: `Mock Place ${placeId.split("_")[2]}`,
+      address: "123 Mock Street, Auckland, New Zealand",
+      location: { lat: -36.8485, lng: 174.7633 },
+      category: "Other",
     };
   }
 
-  // 确保API和服务已初始化
-  if (!isApiLoaded || !placesService) {
-    console.log("尝试初始化Maps服务后再获取地点详情");
-    try {
-      await loadGoogleMapsApi();
-    } catch (error) {
-      console.error("无法加载 Google Maps API:", error);
-      throw error;
+  try {
+    // Ensure API is loaded
+    await ensureApiLoaded();
+    console.log("Maps API已加载，准备获取地点详情");
+
+    // Need a HTML element for PlacesService
+    let placesDiv = document.getElementById("places-service-container");
+    if (!placesDiv) {
+      placesDiv = document.createElement("div");
+      placesDiv.id = "places-service-container";
+      placesDiv.style.display = "none";
+      document.body.appendChild(placesDiv);
     }
 
-    // 二次检查
-    if (!placesService) {
-      console.error("PlacesService初始化失败");
-      throw new Error("Places service could not be initialized");
-    }
-  }
+    // Create PlacesService instance
+    const placesService = new window.google.maps.places.PlacesService(
+      placesDiv
+    );
 
-  return new Promise((resolve, reject) => {
-    console.log(`获取地点详情: ${placeId}`);
-    try {
+    // Return promise for details
+    return new Promise((resolve, reject) => {
+      console.log("调用PlacesService.getDetails...");
       placesService.getDetails(
         {
-          placeId,
-          fields: ["name", "geometry", "formatted_address", "types", "photos"],
+          placeId: placeId,
+          fields: ["name", "formatted_address", "geometry", "types"],
         },
-        (place, status) => {
-          console.log(`获取地点详情状态: ${status}`);
+        (result, status) => {
+          console.log(`PlacesService.getDetails 返回状态: ${status}`);
+
           if (
             status === window.google.maps.places.PlacesServiceStatus.OK &&
-            place
+            result
           ) {
-            console.log(`成功获取地点详情: ${place.name}`);
-            resolve(place);
+            console.log("成功获取地点详情:", result);
+
+            // Format the result
+            const formattedResult = {
+              id: result.place_id,
+              name: result.name,
+              address: result.formatted_address,
+              location: result.geometry?.location
+                ? {
+                    lat: result.geometry.location.lat(),
+                    lng: result.geometry.location.lng(),
+                  }
+                : null,
+              category: result.types
+                ? getCategoryFromTypes(result.types)
+                : "Other",
+            };
+
+            console.log("格式化后的地点详情:", formattedResult);
+            resolve(formattedResult);
           } else {
-            console.error(`获取地点详情失败。状态: ${status}`);
-            reject(new Error(`Failed to get place details. Status: ${status}`));
+            console.error(`获取地点详情失败，状态: ${status}`);
+            reject(new Error(`Failed to get place details: ${status}`));
           }
         }
       );
-    } catch (error) {
-      console.error("调用PlacesService时出错:", error);
-      reject(error);
-    }
-  });
+    });
+  } catch (error) {
+    console.error("获取地点详情时出错:", error);
+    throw error;
+  }
 };
 
 /**
- * 将Google地点类型转换为应用程序类别
- * @param {Array} types Google地点类型数组
- * @returns {string} 应用程序类别
+ * Map Google place types to app categories
+ * @param {Array<string>} types - Google place types
+ * @returns {string} - Mapped category
  */
-export const mapPlaceTypeToCategory = (types) => {
-  if (!types || types.length === 0) return "Other";
-
+const getCategoryFromTypes = (types) => {
   if (types.includes("school") || types.includes("university")) {
     return "Education";
-  } else if (types.includes("hospital") || types.includes("doctor")) {
+  } else if (
+    types.includes("hospital") ||
+    types.includes("doctor") ||
+    types.includes("health")
+  ) {
     return "Medical";
-  } else if (types.includes("shopping_mall") || types.includes("store")) {
+  } else if (types.includes("store") || types.includes("shopping_mall")) {
     return "Shopping";
-  } else if (types.includes("restaurant") || types.includes("cafe")) {
+  } else if (
+    types.includes("restaurant") ||
+    types.includes("cafe") ||
+    types.includes("bar")
+  ) {
     return "Leisure/Dining";
-  } else if (types.includes("park")) {
+  } else if (types.includes("park") || types.includes("natural_feature")) {
     return "Parks";
-  } else if (types.includes("tourist_attraction")) {
+  } else if (types.includes("tourist_attraction") || types.includes("museum")) {
     return "Tourism/Entertainment";
-  } else if (types.includes("transit_station")) {
+  } else if (types.includes("transit_station") || types.includes("airport")) {
     return "Transport";
   }
-
   return "Other";
 };
 
 export default {
   loadGoogleMapsApi,
+  ensureApiLoaded,
   searchPlaces,
   getPlaceDetails,
-  mapPlaceTypeToCategory,
+  getCategoryFromTypes,
 };

@@ -1,0 +1,61 @@
+# Cursor规则文件 - 定义优先级和文件关联
+
+# 最高优先级文件 - 用户明确指定的核心文件
+[priority.highest]
+FrontEnd/src/components/Dashboard.jsx
+FrontEnd/src/services/mapsService.js
+BackEnd/app.py
+FrontEnd/src/services/routesService.js
+FrontEnd/src/components/DestinationSelector.jsx
+FrontEnd/src/services/api.js
+FrontEnd/src/components/ParkingConsole.jsx
+FrontEnd/src/components/InfoPanel.jsx
+FrontEnd/src/components/AuthCallback.jsx
+FrontEnd/src/components/Login.jsx
+FrontEnd/src/index.css
+
+# 高优先级文件 - 核心组件和服务
+[priority.high]
+FrontEnd/src/components/GoogleMap.jsx
+FrontEnd/src/components/*.jsx
+FrontEnd/src/services/*.js
+FrontEnd/src/contexts/*.jsx
+FrontEnd/src/contexts/*.js
+BackEnd/*.py
+
+# 中等优先级 - 配置文件和样式
+[priority.medium]
+FrontEnd/src/App.jsx
+FrontEnd/src/main.jsx
+FrontEnd/src/*.css
+FrontEnd/src/styles/*.css
+FrontEnd/src/styles/*.scss
+FrontEnd/*.json
+BackEnd/*.json
+*.config.js
+vite.config.js
+package.json
+requirements.txt
+
+# 低优先级 - 其他项目文件
+[priority.low]
+*.md
+LICENSE
+.gitignore
+
+# 文件关联 - 帮助Cursor理解相关文件
+[related]
+# Dashboard相关文件
+FrontEnd/src/components/Dashboard.jsx = FrontEnd/src/components/GoogleMap.jsx, FrontEnd/src/components/DestinationSelector.jsx, FrontEnd/src/services/routesService.js, FrontEnd/src/services/mapsService.js
+
+# 路由服务相关文件
+FrontEnd/src/services/routesService.js = BackEnd/app.py, FrontEnd/src/services/api.js, FrontEnd/src/components/GoogleMap.jsx
+
+# 地图服务相关文件
+FrontEnd/src/services/mapsService.js = FrontEnd/src/components/GoogleMap.jsx, FrontEnd/src/components/DestinationSelector.jsx
+
+# 后端API相关文件
+BackEnd/app.py = FrontEnd/src/services/api.js, FrontEnd/src/services/routesService.js
+
+# 目的地选择器相关文件
+FrontEnd/src/components/DestinationSelector.jsx = FrontEnd/src/services/mapsService.js, FrontEnd/src/services/api.js 

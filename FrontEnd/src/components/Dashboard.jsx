@@ -5,6 +5,7 @@ import {
   CircularProgress,
   Button,
   Alert,
+  AlertTitle,
   Box,
   Typography,
   Paper,
@@ -24,6 +25,8 @@ import {
   ListItemIcon,
   ListItemText,
   LinearProgress,
+  Chip,
+  Tooltip,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -36,9 +39,14 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import NavigationIcon from "@mui/icons-material/Navigation";
 import DirectionsIcon from "@mui/icons-material/Directions";
 import TimelapseIcon from "@mui/icons-material/Timelapse";
+import PaidIcon from "@mui/icons-material/Paid";
+import CancelIcon from "@mui/icons-material/Cancel";
+import CloseIcon from "@mui/icons-material/Close";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
 import DestinationSelector from "./DestinationSelector";
 import { api } from "../services/api";
 import routesService from "../services/routesService";
+import GoogleMap from "./GoogleMap"; // 导入新的GoogleMap组件
 
 function Dashboard() {
   const { currentUser, accessToken, logout } = useAuth();
@@ -51,7 +59,7 @@ function Dashboard() {
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [parkingSpots, setParkingSpots] = useState([]);
-  const [navigationProgress, setNavigationProgress] = useState(0);
+  const [navigationProgress, setNavigationProgress] = useState("idle");
   const [isParked, setIsParked] = useState(false);
   const navigationTimer = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
@@ -62,6 +70,18 @@ function Dashboard() {
   const mapRef = useRef(null);
   const googleMapsRef = useRef(null);
   const directionsRendererRef = useRef(null);
+  const [vehiclePosition, setVehiclePosition] = useState(null);
+  const [activeParkingLot, setActiveParkingLot] = useState(null);
+  const [parkingLotDetails, setParkingLotDetails] = useState(null);
+  const [nearbyParkings, setNearbyParkings] = useState([]);
+  const [mapsApiLoaded, setMapsApiLoaded] = useState(false);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [isMapLoading, setIsMapLoading] = useState(false);
+  const [animationInProgress, setAnimationInProgress] = useState(false);
+  const [showArrivalDialog, setShowArrivalDialog] = useState(false);
+  const animationTimerRef = useRef(null);
+  const animationStartTimeRef = useRef(null);
+  const animationDurationRef = useRef(5000); // 5秒动画时长
 
   useEffect(() => {
     async function loadInitialData() {
@@ -95,24 +115,144 @@ function Dashboard() {
   const handleSelectDestination = (destination) => {
     setSelectedDestination(destination);
     setActiveStep(1);
+
+    // 如果已经获取到用户位置，则立即计算路线
+    // 这样可以确保地图在用户选择目的地后立即更新
+    if (userLocation && destination && destination.location) {
+      console.log("选择了目的地，立即计算路线", {
+        origin: userLocation,
+        destination: destination.location,
+      });
+      calculateRoute(userLocation, destination.location);
+    } else {
+      console.log("选择了目的地，但用户位置未知，将在位置获取后计算路线");
+    }
   };
 
+  /**
+   * 确认目的地并开始导航
+   */
   const confirmDestination = () => {
-    setActiveStep(2);
-    if (navigationTimer.current) {
-      clearInterval(navigationTimer.current);
+    console.log("确认目的地：", selectedDestination);
+    if (!selectedDestination) {
+      setError("Please select a destination first");
+      return;
     }
 
-    setNavigationProgress(0);
-    navigationTimer.current = setInterval(() => {
-      setNavigationProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(navigationTimer.current);
-          return 100;
+    // 更新导航状态
+    setActiveStep(1); // 进入导航步骤
+    setNavigationProgress("navigating");
+
+    // 获取当前位置并计算路线 (如果还没有路线计算)
+    if (!routeDetails && userLocation) {
+      calculateRoute(userLocation, selectedDestination.location);
+    }
+
+    // 开始导航动画
+    startNavigationAnimation();
+  };
+
+  /**
+   * 开始导航动画
+   */
+  const startNavigationAnimation = () => {
+    // 清除可能的旧计时器
+    if (animationTimerRef.current) {
+      clearInterval(animationTimerRef.current);
+    }
+
+    setAnimationInProgress(true);
+    setNavigationProgress(0); // 从0开始
+    animationStartTimeRef.current = Date.now();
+
+    // 创建动画计时器，每50ms更新一次
+    animationTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - animationStartTimeRef.current;
+      const progress = Math.min(
+        100,
+        (elapsed / animationDurationRef.current) * 100
+      );
+
+      setNavigationProgress(progress);
+
+      // 动画完成
+      if (progress >= 100) {
+        clearInterval(animationTimerRef.current);
+        animationTimerRef.current = null;
+        setAnimationInProgress(false);
+
+        // 居中显示目的地
+        if (googleMapsRef.current && selectedDestination?.location) {
+          googleMapsRef.current.panTo(selectedDestination.location);
+          googleMapsRef.current.setZoom(15);
         }
-        return prev + 1;
-      });
-    }, 300);
+
+        // 显示到达目的地对话框
+        setShowArrivalDialog(true);
+        setNavigationProgress("arrived");
+      }
+    }, 50);
+  };
+
+  /**
+   * 启用AI引导停车
+   */
+  const enableAIParking = () => {
+    setShowArrivalDialog(false);
+
+    // 模拟获取附近停车场数据
+    if (selectedDestination) {
+      const mockNearbyParkings = [
+        {
+          id: "parking_1",
+          name: `${selectedDestination.name} Parking A`,
+          location: {
+            lat: selectedDestination.location.lat + 0.002,
+            lng: selectedDestination.location.lng + 0.003,
+          },
+          distance_to_destination: Math.floor(Math.random() * 200) + 100,
+          available_spots: Math.floor(Math.random() * 30) + 5,
+          total_spots: Math.floor(Math.random() * 50) + 40,
+          hourly_rate: (Math.random() * 5 + 5).toFixed(2),
+        },
+        {
+          id: "parking_2",
+          name: `Downtown Parking`,
+          location: {
+            lat: selectedDestination.location.lat - 0.001,
+            lng: selectedDestination.location.lng + 0.001,
+          },
+          distance_to_destination: Math.floor(Math.random() * 200) + 150,
+          available_spots: Math.floor(Math.random() * 20) + 3,
+          total_spots: Math.floor(Math.random() * 40) + 30,
+          hourly_rate: (Math.random() * 4 + 3).toFixed(2),
+        },
+        {
+          id: "parking_3",
+          name: `Premium Parking`,
+          location: {
+            lat: selectedDestination.location.lat + 0.001,
+            lng: selectedDestination.location.lng - 0.002,
+          },
+          distance_to_destination: Math.floor(Math.random() * 300) + 200,
+          available_spots: Math.floor(Math.random() * 15) + 2,
+          total_spots: Math.floor(Math.random() * 30) + 20,
+          hourly_rate: (Math.random() * 6 + 8).toFixed(2),
+        },
+      ];
+
+      setNearbyParkings(mockNearbyParkings);
+    }
+
+    setNavigationProgress("arrived");
+  };
+
+  /**
+   * 跳过AI引导停车
+   */
+  const skipAIParking = () => {
+    setShowArrivalDialog(false);
+    setNavigationProgress("navigating");
   };
 
   const handleArriveParking = (parkingLot) => {
@@ -120,11 +260,12 @@ function Dashboard() {
     api
       .getParkingLotDetails(parkingLot.id)
       .then((details) => {
-        setParkingSpots(details);
+        setParkingLotDetails(details);
+        setActiveParkingLot(parkingLot);
       })
       .catch((err) => {
         console.error("Error fetching parking lot details:", err);
-        setParkingSpots({
+        setParkingLotDetails({
           recommended_spot: {
             id: "A12",
             type: "standard",
@@ -152,8 +293,9 @@ function Dashboard() {
       clearInterval(navigationTimer.current);
     }
     setSelectedDestination(null);
-    setParkingSpots([]);
-    setNavigationProgress(0);
+    setParkingLotDetails(null);
+    setActiveParkingLot(null);
+    setNavigationProgress("idle");
     setIsParked(false);
     setActiveStep(0);
   };
@@ -167,10 +309,13 @@ function Dashboard() {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
+          console.log("获取到用户位置:", currentLocation);
           setUserLocation(currentLocation);
           setLoadingLocation(false);
 
+          // 如果用户已选择目的地，立即计算路线
           if (selectedDestination && selectedDestination.location) {
+            console.log("用户位置更新，重新计算路线");
             calculateRoute(currentLocation, selectedDestination.location);
           }
         },
@@ -195,94 +340,104 @@ function Dashboard() {
 
       const defaultLocation = { lat: -36.8508, lng: 174.7645 };
       setUserLocation(defaultLocation);
+
+      // 如果有目的地，也计算路线
+      if (selectedDestination && selectedDestination.location) {
+        calculateRoute(defaultLocation, selectedDestination.location);
+      }
     }
   };
 
   const calculateRoute = async (origin, destination) => {
+    if (!origin || !destination) {
+      console.error("无法计算路线：缺少起点或终点坐标", {
+        origin,
+        destination,
+      });
+      setMapError("无法计算路线：缺少起点或终点坐标");
+      return null;
+    }
+
+    console.log("计算路线参数:", {
+      origin: origin,
+      destination: destination,
+    });
+
     try {
-      setLoadingRoute(true);
-      setMapError("");
+      setIsMapLoading(true);
+      setMapError(null);
 
-      const routeData = await routesService.calculateRoute(origin, destination);
+      // 确保坐标是数字类型
+      const validOrigin = {
+        lat: Number(origin.lat),
+        lng: Number(origin.lng),
+      };
 
+      const validDestination = {
+        lat: Number(destination.lat),
+        lng: Number(destination.lng),
+      };
+
+      // 调用路线服务
+      const routeData = await routesService.calculateRoute(
+        validOrigin,
+        validDestination
+      );
+
+      // 记录结果以便调试
+      console.log("路线计算结果:", routeData);
+
+      // 设置路线详情，这将触发GoogleMap组件中的useEffect
       setRouteDetails(routeData);
 
-      if (
-        routeData.fromJSAPI &&
-        routeData.rawResult &&
-        mapRef.current &&
-        googleMapsRef.current
-      ) {
-        if (!directionsRendererRef.current) {
-          directionsRendererRef.current =
-            new window.google.maps.DirectionsRenderer({
-              suppressMarkers: false,
-              polylineOptions: {
-                strokeColor: "#4fc3f7",
-                strokeWeight: 5,
-              },
-            });
-        }
+      setIsMapLoading(false);
+      return routeData;
+    } catch (error) {
+      console.error("计算路由时出错:", error);
+      setIsMapLoading(false);
+      setMapError(`计算路线失败: ${error.message}`);
 
-        directionsRendererRef.current.setMap(googleMapsRef.current);
-        directionsRendererRef.current.setDirections(routeData.rawResult);
-      } else if (
-        routeData.encodedPolyline &&
-        mapRef.current &&
-        googleMapsRef.current
-      ) {
+      // 创建静态路线作为后备方案
+      const staticRoute = routesService.createStaticRoute(origin, destination);
+      setRouteDetails(staticRoute);
+      return staticRoute;
+    }
+  };
+
+  // 创建备用路线（在主方法失败时使用）
+  const createFallbackRoute = (origin, destination) => {
+    if (googleMapsRef.current) {
+      try {
+        // 清除之前的渲染器
         if (directionsRendererRef.current) {
           directionsRendererRef.current.setMap(null);
         }
 
-        if (
-          !window.google ||
-          !window.google.maps ||
-          !window.google.maps.geometry ||
-          !window.google.maps.geometry.encoding
-        ) {
-          console.warn("Google Maps Geometry库不可用，无法解码路线");
+        // 创建简单的直线路径
+        const simplePath = [
+          { lat: origin.lat, lng: origin.lng },
+          { lat: destination.lat, lng: destination.lng },
+        ];
 
-          const simplePath = [
-            new google.maps.LatLng(origin.lat, origin.lng),
-            new google.maps.LatLng(destination.lat, destination.lng),
-          ];
+        // 创建路线线条
+        const polyline = new google.maps.Polyline({
+          path: simplePath,
+          geodesic: true,
+          strokeColor: "#ff4136",
+          strokeOpacity: 0.7,
+          strokeWeight: 3,
+        });
 
-          const routePolyline = new google.maps.Polyline({
-            path: simplePath,
-            strokeColor: "#4fc3f7",
-            strokeWeight: 5,
-            strokeOpacity: 0.8,
-          });
+        polyline.setMap(googleMapsRef.current);
 
-          routePolyline.setMap(googleMapsRef.current);
+        // 设置地图视图以显示整个路线
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(new google.maps.LatLng(origin.lat, origin.lng));
+        bounds.extend(new google.maps.LatLng(destination.lat, destination.lng));
+        googleMapsRef.current.fitBounds(bounds);
 
-          const bounds = new google.maps.LatLngBounds();
-          bounds.extend(new google.maps.LatLng(origin.lat, origin.lng));
-          bounds.extend(
-            new google.maps.LatLng(destination.lat, destination.lng)
-          );
-          googleMapsRef.current.fitBounds(bounds);
-        } else {
-          const decodePath = google.maps.geometry.encoding.decodePath(
-            routeData.encodedPolyline
-          );
-
-          const routePolyline = new google.maps.Polyline({
-            path: decodePath,
-            strokeColor: "#4fc3f7",
-            strokeWeight: 5,
-            strokeOpacity: 0.8,
-          });
-
-          const bounds = new google.maps.LatLngBounds();
-          decodePath.forEach((point) => bounds.extend(point));
-          googleMapsRef.current.fitBounds(bounds);
-
-          routePolyline.setMap(googleMapsRef.current);
-        }
-
-        const originMarker = new google.maps.Marker({
+        // 添加起点和终点标记
+        new google.maps.Marker({
           position: origin,
           map: googleMapsRef.current,
           title: "Starting Point",
@@ -291,21 +446,47 @@ function Dashboard() {
           },
         });
 
-        const destinationMarker = new google.maps.Marker({
+        new google.maps.Marker({
           position: destination,
           map: googleMapsRef.current,
-          title: selectedDestination.name,
+          title: selectedDestination ? selectedDestination.name : "Destination",
           icon: {
             url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
           },
         });
+
+        // 创建简单的路线详情以显示
+        const distance = calculateDistance(origin, destination);
+        const distanceKm = (distance / 1000).toFixed(1);
+        const durationMinutes = Math.round((distance / 1000) * (60 / 50)); // 假设平均速度50km/h
+
+        setRouteDetails({
+          distance: `${distanceKm} km`,
+          duration: `${durationMinutes} mins (est.)`,
+          steps: [],
+          isStaticRoute: true,
+        });
+      } catch (fallbackError) {
+        console.error("创建备用路线也失败:", fallbackError);
       }
-    } catch (error) {
-      console.error("Error calculating route:", error);
-      setMapError("Failed to calculate route. Please try again.");
-    } finally {
-      setLoadingRoute(false);
     }
+  };
+
+  // 计算两点之间的距离（米）- 便于创建备用路线
+  const calculateDistance = (point1, point2) => {
+    const R = 6371e3; // 地球半径（米）
+    const φ1 = (point1.lat * Math.PI) / 180;
+    const φ2 = (point2.lat * Math.PI) / 180;
+    const Δφ = ((point2.lat - point1.lat) * Math.PI) / 180;
+    const Δλ = ((point2.lng - point1.lng) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+
+    return distance;
   };
 
   const initializeMap = () => {
@@ -364,12 +545,46 @@ function Dashboard() {
     }
   };
 
+  // 检查初始化地图的逻辑
   useEffect(() => {
-    if (activeStep === 1) {
-      getCurrentLocation();
+    // 页面加载时就获取当前位置并初始化地图，不再等待activeStep === 1
+    getCurrentLocation();
 
-      const googleMapsScript = document.getElementById("google-maps-script");
-      if (!googleMapsScript) {
+    // 改进Google Maps加载逻辑
+    const loadGoogleMaps = () => {
+      return new Promise((resolve, reject) => {
+        // Check if Google Maps is already loaded
+        if (window.google && window.google.maps) {
+          console.log("Google Maps already loaded, using directly");
+          resolve(window.google.maps);
+          return;
+        }
+
+        // Check if script already exists
+        const googleMapsScript = document.getElementById("google-maps-script");
+        if (googleMapsScript) {
+          console.log(
+            "Google Maps script already exists, waiting for it to load"
+          );
+          // Create a check function
+          const checkGoogleMapsLoaded = setInterval(() => {
+            if (window.google && window.google.maps) {
+              clearInterval(checkGoogleMapsLoaded);
+              console.log("Google Maps loading complete");
+              resolve(window.google.maps);
+            }
+          }, 100);
+
+          // Set timeout
+          setTimeout(() => {
+            clearInterval(checkGoogleMapsLoaded);
+            reject(new Error("Google Maps loading timeout"));
+          }, 10000);
+          return;
+        }
+
+        // Add new script
+        console.log("Adding Google Maps script");
         const script = document.createElement("script");
         script.id = "google-maps-script";
         // Get API key from environment variables
@@ -379,19 +594,118 @@ function Dashboard() {
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&map_ids=5a8d875e3485586f`;
         script.async = true;
         script.defer = true;
-        script.onload = initializeMap;
-        document.head.appendChild(script);
-      } else {
-        initializeMap();
-      }
-    }
-  }, [activeStep, selectedDestination]);
 
+        // Create callback function
+        const callbackName = `initGoogleMaps_${Date.now()}`;
+        window[callbackName] = () => {
+          console.log("Google Maps loading callback triggered");
+          if (window.google && window.google.maps) {
+            resolve(window.google.maps);
+          } else {
+            reject(new Error("Google Maps loading exception"));
+          }
+          delete window[callbackName];
+        };
+
+        // Add callback to URL
+        script.src = `${script.src}&callback=${callbackName}`;
+
+        // Handle script loading errors
+        script.onerror = () => {
+          reject(new Error("Google Maps script loading failed"));
+        };
+
+        document.head.appendChild(script);
+      });
+    };
+
+    // Load map and initialize
+    loadGoogleMaps()
+      .then((googleMaps) => {
+        console.log("Google Maps loaded successfully, initializing map");
+        setGoogleMapsLoaded(true);
+        initializeMap();
+      })
+      .catch((error) => {
+        console.error("Google Maps loading failed:", error);
+        setMapError("Failed to load Google Maps. Please try again later.");
+      });
+  }, []); // 只在组件挂载时运行一次
+
+  // 添加全局样式控制，防止页面滚动
   useEffect(() => {
-    if (activeStep === 1 && userLocation) {
-      initializeMap();
+    // 添加防止滚动的样式
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    document.documentElement.style.height = "100%";
+    document.body.style.height = "100%";
+    document.body.style.margin = "0";
+
+    // 组件卸载时移除样式
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      document.documentElement.style.height = "";
+      document.body.style.height = "";
+      document.body.style.margin = "";
+    };
+  }, []);
+
+  // Check if Google Maps API is loaded
+  useEffect(() => {
+    const checkMapsApiLoaded = () => {
+      return window.google && window.google.maps;
+    };
+
+    // If already loaded, set state
+    if (checkMapsApiLoaded()) {
+      setMapsApiLoaded(true);
+      return;
     }
-  }, [userLocation]);
+
+    // Otherwise set an observer to wait for loading
+    const apiLoadInterval = setInterval(() => {
+      if (checkMapsApiLoaded()) {
+        setMapsApiLoaded(true);
+        clearInterval(apiLoadInterval);
+      }
+    }, 100);
+
+    // Set timeout to avoid infinite waiting
+    const timeout = setTimeout(() => {
+      clearInterval(apiLoadInterval);
+      if (!checkMapsApiLoaded()) {
+        setError(
+          "Google Maps API loading timeout. Please refresh the page to try again."
+        );
+      }
+    }, 10000);
+
+    // Cleanup function
+    return () => {
+      clearInterval(apiLoadInterval);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  // 初始化地图 - 仅在API加载完成后进行
+  useEffect(() => {
+    if (
+      mapsApiLoaded &&
+      userLocation &&
+      selectedDestination &&
+      selectedDestination.location
+    ) {
+      console.log("Maps API loaded, initializing map now");
+      calculateRoute(userLocation, selectedDestination.location);
+    }
+  }, [mapsApiLoaded, userLocation, selectedDestination]);
+
+  // 添加一个函数处理地图实例引用
+  const handleMapReady = (mapInstance) => {
+    console.log("地图实例已就绪");
+    googleMapsRef.current = mapInstance;
+  };
 
   if (loading) {
     return (
@@ -439,1325 +753,741 @@ function Dashboard() {
   return (
     <Box
       sx={{
-        display: "flex",
-        flexDirection: "column",
         height: "100vh",
-        overflow: "hidden",
-        bgcolor: "#121212",
+        width: "100vw",
+        position: "fixed", // 改为fixed定位
+        top: 0,
+        left: 0,
+        overflow: "hidden", // 禁止溢出滚动
+        backgroundColor: "#000", // 设置黑色背景，防止地图加载时的白色闪烁
       }}
     >
-      <AppBar position="static" sx={{ bgcolor: "#1a1a1a" }}>
-        <Toolbar>
-          {activeStep > 0 && (
-            <IconButton
-              edge="start"
-              color="inherit"
-              onClick={resetNavigation}
-              sx={{ mr: 2 }}
-            >
-              <ArrowBackIcon />
-            </IconButton>
-          )}
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Smart Parking System
-          </Typography>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Typography variant="body2" sx={{ mr: 2 }}>
-              {currentUser?.email || "User"}
-            </Typography>
-            <IconButton
-              color="inherit"
-              onClick={logout}
-              size="small"
-              sx={{ ml: 1 }}
-            >
-              <LogoutIcon />
-            </IconButton>
-          </Box>
-        </Toolbar>
-        <Box
-          sx={{
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            p: 1,
-            px: 4,
-          }}
-        >
-          <Stepper
-            activeStep={activeStep}
+      {/* 作为全屏背景的导航地图 */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%", // 确保宽度为100%
+          height: "100%", // 确保高度为100%
+          zIndex: 0,
+          backgroundColor: "#202124", // 深色背景作为地图加载前的占位
+        }}
+      >
+        {/* 使用GoogleMap组件 - 传递关键属性和回调 */}
+        <GoogleMap
+          origin={userLocation}
+          destination={selectedDestination?.location}
+          navigationProgress={navigationProgress}
+          onPositionChange={(newPosition) => setVehiclePosition(newPosition)}
+          routeDetails={routeDetails}
+          onMapReady={handleMapReady}
+          mapError={mapError}
+          isLoading={loadingRoute || loadingLocation}
+          key={`map-${selectedDestination?.id || "default"}`} // 添加key确保在选择新目的地时正确重渲染
+        />
+      </Box>
+
+      {/* 顶部应用栏 */}
+      <AppBar
+        position="absolute"
+        color="transparent"
+        elevation={0}
+        sx={{
+          zIndex: 5,
+          backgroundColor: "rgba(32,33,36,0.7)",
+          backdropFilter: "blur(8px)",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+        }}
+      >
+        <Toolbar variant="dense">
+          <IconButton
+            edge="start"
+            color="inherit"
+            onClick={resetNavigation}
+            size="small"
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography
+            variant="h6"
+            component="div"
             sx={{
-              "& .MuiStepLabel-label": {
-                color: "white",
-              },
-              "& .MuiStepIcon-root.Mui-active": {
-                color: "#4fc3f7",
-              },
+              flexGrow: 1,
+              ml: 1,
+              fontSize: { xs: "0.9rem", sm: "1.25rem" },
             }}
           >
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-        </Box>
+            Smart Parking System
+          </Typography>
+          <Typography
+            variant="body2"
+            color="inherit"
+            sx={{ mr: 1, display: { xs: "none", sm: "block" } }}
+          >
+            {currentUser?.email || "User"}
+          </Typography>
+          <IconButton color="inherit" onClick={logout} size="small">
+            <LogoutIcon />
+          </IconButton>
+        </Toolbar>
       </AppBar>
 
+      {/* 垂直导航进度指示器 - Google Maps风格 */}
       <Box
-        sx={{ flex: 1, overflow: "auto", bgcolor: "#121212", color: "white" }}
+        sx={{
+          position: "absolute",
+          top: 70,
+          left: 15,
+          bottom: navigationProgress !== "idle" ? 80 : 20,
+          zIndex: 2,
+          display: "flex",
+          flexDirection: "column",
+          width: 60,
+        }}
       >
-        {activeStep === 0 && (
-          <DestinationSelector
-            destinations={destinations}
-            onSelectDestination={handleSelectDestination}
-          />
-        )}
+        <Stepper
+          activeStep={activeStep}
+          orientation="vertical"
+          sx={{
+            backgroundColor: "rgba(32,33,36,0.75)",
+            backdropFilter: "blur(8px)",
+            borderRadius: 2,
+            p: 1,
+            height: "auto",
+            color: "white",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            "& .MuiStepConnector-line": {
+              minHeight: 20,
+            },
+            "& .MuiStepLabel-label": {
+              display: "none",
+            },
+            "& .MuiStepIcon-root": {
+              color: "rgba(255,255,255,0.3)",
+              "&.Mui-active": {
+                color: "#1A73E8",
+              },
+              "&.Mui-completed": {
+                color: "#34A853",
+              },
+            },
+          }}
+        >
+          {steps.map((label) => (
+            <Step key={label}>
+              <StepLabel></StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </Box>
 
-        {activeStep === 1 && selectedDestination && (
-          <Box sx={{ p: 3, maxWidth: "1200px", mx: "auto" }}>
-            <Paper sx={{ p: 3, mb: 3, bgcolor: "#1e1e1e", color: "white" }}>
-              <Typography variant="h5" gutterBottom>
-                Confirm Your Destination
+      {/* 步骤提示文本 - 显示当前步骤 */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 15,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 6,
+          backgroundColor: "rgba(32,33,36,0.75)",
+          backdropFilter: "blur(8px)",
+          borderRadius: 4,
+          py: 0.5,
+          px: 2,
+          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+        }}
+      >
+        <Typography
+          variant="body2"
+          align="center"
+          sx={{ fontWeight: 500, color: "white" }}
+        >
+          {steps[activeStep]}
+        </Typography>
+      </Box>
+
+      {/* 主体内容区域 - 作为左侧浮动卡片显示在地图上 */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 70,
+          left: 90,
+          zIndex: 1,
+          pointerEvents: "none", // 这允许点击穿透到地图
+          maxWidth: {
+            xs: "calc(100% - 100px)",
+            sm: 350,
+            md: 400,
+          },
+          maxHeight: "calc(100vh - 100px)",
+        }}
+      >
+        {/* 内容卡片 - 根据导航阶段显示不同内容 */}
+        <Card
+          sx={{
+            width: "100%",
+            backgroundColor: "rgba(32,33,36,0.85)",
+            backdropFilter: "blur(12px)",
+            color: "white",
+            borderRadius: 2,
+            pointerEvents: "auto", // 恢复卡片的点击事件
+            boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
+            overflow: "hidden",
+            maxHeight: "calc(100vh - 100px)",
+          }}
+        >
+          <CardContent sx={{ p: 2, pb: 0 }}>
+            <Typography
+              variant="subtitle1"
+              sx={{ mb: 1.5, fontWeight: 500, color: "#8AB4F8" }}
+            >
+              {navigationProgress === "idle"
+                ? "Confirm Destination"
+                : navigationProgress === "navigating"
+                ? "Navigating to Destination"
+                : navigationProgress === "arrived"
+                ? "Select Parking Lot"
+                : navigationProgress === "parking"
+                ? "Finding Parking Spot"
+                : "Parking Complete"}
+            </Typography>
+
+            {/* 当前位置显示 */}
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+                <MyLocationIcon
+                  color="primary"
+                  sx={{ mr: 1, fontSize: "1rem" }}
+                />
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  Current Location
+                </Typography>
+              </Box>
+              <Typography
+                variant="caption"
+                sx={{ ml: 3, display: "block", color: "rgba(255,255,255,0.7)" }}
+              >
+                {userLocation?.lat?.toFixed(4)}, {userLocation?.lng?.toFixed(4)}
               </Typography>
-              <Divider sx={{ mb: 2, bgcolor: "rgba(255,255,255,0.1)" }} />
+            </Box>
 
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={5}>
-                  <Box
-                    sx={{
-                      mb: 3,
-                      p: 2,
-                      bgcolor: "rgba(0,0,0,0.2)",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                      <MyLocationIcon sx={{ mr: 1, color: "#4fc3f7" }} />
-                      <Typography variant="subtitle2" fontWeight="bold">
-                        Current Location
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" color="#bbbbbb">
-                      {userLocation
-                        ? `${userLocation.lat.toFixed(
-                            4
-                          )}, ${userLocation.lng.toFixed(4)}`
-                        : "Detecting your location..."}
+            {/* 目的地选择和显示 */}
+            {navigationProgress === "idle" && (
+              <Box>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+                  <PlaceIcon color="error" sx={{ mr: 1, fontSize: "1rem" }} />
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    Destination
+                  </Typography>
+                </Box>
+
+                {selectedDestination ? (
+                  <Box sx={{ ml: 3, mb: 2 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {selectedDestination.name}
                     </Typography>
                     <Typography
                       variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mt: 0.5 }}
+                      sx={{ display: "block", color: "rgba(255,255,255,0.7)" }}
                     >
-                      {loadingLocation
-                        ? "Getting precise location..."
-                        : "Location services enabled"}
+                      {selectedDestination.address || "No address available"}
                     </Typography>
-                  </Box>
-
-                  <Box
-                    sx={{
-                      mb: 3,
-                      p: 2,
-                      bgcolor: "rgba(0,0,0,0.2)",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                      <PlaceIcon sx={{ mr: 1, color: "#f44336" }} />
-                      <Typography variant="subtitle2" fontWeight="bold">
-                        Destination
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="body1"
-                      fontWeight="medium"
-                      gutterBottom
-                    >
-                      {selectedDestination.name}
-                    </Typography>
-                    <Typography variant="body2" color="#bbbbbb" gutterBottom>
-                      {selectedDestination.address}
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
-                      <Box
-                        sx={{
-                          bgcolor: "rgba(255,255,255,0.1)",
-                          px: 1,
-                          py: 0.5,
-                          borderRadius: 1,
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        {selectedDestination.category}
-                      </Box>
-                    </Box>
-                  </Box>
-
-                  {userLocation && routeDetails && (
-                    <Box
-                      sx={{
-                        mb: 3,
-                        p: 2,
-                        bgcolor: "rgba(0,0,0,0.2)",
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Typography
-                        variant="subtitle2"
-                        fontWeight="bold"
-                        gutterBottom
-                      >
-                        Route Information
-                      </Typography>
-                      <List dense>
-                        <ListItem sx={{ px: 1, py: 0.5 }}>
-                          <ListItemIcon
-                            sx={{ minWidth: 36, color: "primary.main" }}
-                          >
-                            <DirectionsIcon />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary="Distance"
-                            secondary={routeDetails.distance}
-                            primaryTypographyProps={{
-                              color: "white",
-                              fontWeight: "medium",
-                            }}
-                            secondaryTypographyProps={{ color: "#bbbbbb" }}
-                          />
-                        </ListItem>
-                        <ListItem sx={{ px: 1, py: 0.5 }}>
-                          <ListItemIcon
-                            sx={{ minWidth: 36, color: "primary.main" }}
-                          >
-                            <TimelapseIcon />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary="Estimated Travel Time"
-                            secondary={routeDetails.duration}
-                            primaryTypographyProps={{
-                              color: "white",
-                              fontWeight: "medium",
-                            }}
-                            secondaryTypographyProps={{ color: "#bbbbbb" }}
-                          />
-                        </ListItem>
-                      </List>
-                    </Box>
-                  )}
-
-                  <Box sx={{ mb: 3 }}>
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight="bold"
-                      sx={{ mb: 1 }}
-                    >
-                      Select Your Vehicle
-                    </Typography>
-                    <Grid container spacing={1}>
-                      {vehicles.map((vehicle) => (
-                        <Grid item xs={6} key={vehicle.id}>
-                          <Card
-                            sx={{
-                              bgcolor:
-                                selectedVehicle?.id === vehicle.id
-                                  ? "primary.dark"
-                                  : "rgba(0,0,0,0.2)",
-                              cursor: "pointer",
-                              "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-                              transition: "background-color 0.3s",
-                              border:
-                                selectedVehicle?.id === vehicle.id
-                                  ? "1px solid #4fc3f7"
-                                  : "1px solid rgba(255,255,255,0.1)",
-                            }}
-                            onClick={() => setSelectedVehicle(vehicle)}
-                          >
-                            <CardContent sx={{ p: 1.5 }}>
-                              <Box
-                                sx={{ display: "flex", alignItems: "center" }}
-                              >
-                                <DirectionsCarIcon sx={{ mr: 1 }} />
-                                <Typography variant="body2">
-                                  {vehicle.name}
-                                </Typography>
-                              </Box>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Box>
-
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    fullWidth
-                    size="large"
-                    onClick={confirmDestination}
-                    disabled={!selectedVehicle || loadingRoute}
-                    sx={{
-                      mt: 2,
-                      py: 1.2,
-                      fontWeight: "bold",
-                      boxShadow: 3,
-                    }}
-                  >
-                    {loadingRoute ? (
-                      <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <CircularProgress
-                          size={20}
-                          sx={{ mr: 1 }}
-                          color="inherit"
-                        />
-                        Calculating Route...
-                      </Box>
-                    ) : (
-                      "CONFIRM AND START NAVIGATION"
-                    )}
-                  </Button>
-                </Grid>
-
-                <Grid item xs={12} md={7}>
-                  <Paper
-                    sx={{
-                      height: "380px",
-                      width: "100%",
-                      bgcolor: "#2a2a2a",
-                      position: "relative",
-                      overflow: "hidden",
-                      borderRadius: 1,
-                      mb: 2,
-                      boxShadow: 3,
-                    }}
-                  >
-                    {mapError && (
-                      <Alert
-                        severity="error"
-                        sx={{
-                          position: "absolute",
-                          top: 10,
-                          left: 10,
-                          right: 10,
-                          zIndex: 10,
-                        }}
-                      >
-                        {mapError}
-                      </Alert>
-                    )}
-
-                    {(loadingLocation || !userLocation) && (
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexDirection: "column",
-                          backgroundColor: "rgba(0,0,0,0.7)",
-                          zIndex: 5,
-                        }}
-                      >
-                        <CircularProgress color="primary" size={40} />
-                        <Typography
-                          variant="body2"
-                          sx={{ mt: 2, color: "white" }}
-                        >
-                          Getting your location...
-                        </Typography>
-                      </Box>
-                    )}
-
-                    <Box
-                      ref={mapRef}
-                      sx={{
-                        height: "100%",
-                        width: "100%",
-                        opacity: loadingRoute ? 0.6 : 1,
-                        transition: "opacity 0.3s",
-                      }}
+                    <Chip
+                      size="small"
+                      label={selectedDestination.category || "Place"}
+                      sx={{ mt: 0.5, fontSize: "0.65rem", height: 20 }}
                     />
-
-                    {loadingRoute && (
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          backgroundColor: "rgba(0,0,0,0.5)",
-                          zIndex: 5,
-                        }}
-                      >
-                        <CircularProgress color="primary" />
-                      </Box>
-                    )}
-
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        bottom: 16,
-                        right: 16,
-                        bgcolor: "rgba(0,0,0,0.7)",
-                        borderRadius: 1,
-                        p: 1,
-                        zIndex: 4,
-                      }}
-                    >
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", mb: 0.5 }}
-                      >
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: "50%",
-                            bgcolor: "#4CAF50",
-                            mr: 1,
-                          }}
-                        />
-                        <Typography variant="caption" color="white">
-                          Current Location
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: "50%",
-                            bgcolor: "#F44336",
-                            mr: 1,
-                          }}
-                        />
-                        <Typography variant="caption" color="white">
-                          Destination
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Paper>
-
-                  <Paper
-                    sx={{
-                      bgcolor: "#2a2a2a",
-                      p: 2,
-                      borderRadius: 1,
-                      height: "210px",
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
+                  </Box>
+                ) : (
+                  <Alert
+                    severity="info"
+                    sx={{ mb: 2, ml: 3, py: 0, fontSize: "0.75rem" }}
                   >
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight="bold"
-                      gutterBottom
-                    >
-                      Turn-by-Turn Directions
-                    </Typography>
+                    Please select a destination
+                  </Alert>
+                )}
 
-                    {!routeDetails || !routeDetails.steps ? (
-                      <Box
+                <DestinationSelector onSelect={handleSelectDestination} />
+              </Box>
+            )}
+
+            {/* 目的地已选择时显示信息 */}
+            {navigationProgress !== "idle" && selectedDestination && (
+              <Box sx={{ mb: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+                  <PlaceIcon color="error" sx={{ mr: 1, fontSize: "1rem" }} />
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    Destination
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ ml: 3, fontWeight: 500 }}>
+                  {selectedDestination.name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    ml: 3,
+                    display: "block",
+                    color: "rgba(255,255,255,0.7)",
+                  }}
+                >
+                  {selectedDestination.address || "No address available"}
+                </Typography>
+              </Box>
+            )}
+
+            {/* 路线信息 */}
+            {(navigationProgress === "idle" ||
+              navigationProgress === "navigating") &&
+              routeDetails && (
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+                    <DirectionsIcon
+                      color="info"
+                      sx={{ mr: 1, fontSize: "1rem" }}
+                    />
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      Route Information
+                    </Typography>
+                  </Box>
+                  <Box sx={{ ml: 3 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ display: "block", color: "rgba(255,255,255,0.7)" }}
+                    >
+                      Distance: {routeDetails.distance}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ display: "block", color: "rgba(255,255,255,0.7)" }}
+                    >
+                      Estimated Travel Time: {routeDetails.duration}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
+            {/* 导航到目的地的按钮 */}
+            {navigationProgress === "idle" && selectedDestination && (
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={confirmDestination}
+                sx={{
+                  mt: 2,
+                  mb: 1,
+                  py: 1,
+                  backgroundColor: "#1A73E8",
+                  "&:hover": {
+                    backgroundColor: "#1765CC",
+                  },
+                }}
+              >
+                Start Navigation
+              </Button>
+            )}
+
+            {/* 显示附近停车场 */}
+            {navigationProgress === "arrived" && (
+              <Box
+                sx={{
+                  maxHeight: "calc(100vh - 220px)",
+                  overflowY: "auto",
+                  pr: 1,
+                  mr: -1,
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  gutterBottom
+                  sx={{ fontWeight: 500 }}
+                >
+                  Nearby Parking Lots
+                </Typography>
+                <Grid container spacing={1}>
+                  {nearbyParkings.map((parking) => (
+                    <Grid item xs={12} key={parking.id}>
+                      <Card
                         sx={{
                           display: "flex",
-                          justifyContent: "center",
-                          alignItems: "center",
-                          flex: 1,
+                          mb: 1,
+                          backgroundColor: "rgba(48,49,52,0.85)",
+                          borderRadius: 1,
                         }}
                       >
-                        <Typography variant="body2" color="text.secondary">
-                          {loadingRoute
-                            ? "Calculating directions..."
-                            : "No directions available"}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <>
-                        <Box sx={{ overflow: "auto", flex: 1 }}>
-                          <List dense sx={{ p: 0 }}>
-                            {routeDetails.steps
-                              .slice(0, 5)
-                              .map((step, index) => (
-                                <ListItem
-                                  key={index}
-                                  divider={
-                                    index <
-                                    Math.min(routeDetails.steps.length, 5) - 1
-                                  }
-                                  sx={{ py: 1 }}
-                                >
-                                  <ListItemIcon
-                                    sx={{ minWidth: 36, color: "primary.main" }}
-                                  >
-                                    <NavigationIcon fontSize="small" />
-                                  </ListItemIcon>
-                                  <ListItemText
-                                    primary={`Step ${index + 1}`}
-                                    secondary={
-                                      <Box>
-                                        <span
-                                          dangerouslySetInnerHTML={{
-                                            __html: step.instructions,
-                                          }}
-                                        />
-                                        {step.distance && (
-                                          <Typography
-                                            variant="caption"
-                                            component="div"
-                                            sx={{ mt: 0.5, color: "#9e9e9e" }}
-                                          >
-                                            {step.distance} •{" "}
-                                            {step.duration || ""}
-                                          </Typography>
-                                        )}
-                                      </Box>
-                                    }
-                                    primaryTypographyProps={{
-                                      color: "white",
-                                      variant: "body2",
-                                      fontWeight: "medium",
-                                    }}
-                                    secondaryTypographyProps={{
-                                      color: "#bbbbbb",
-                                      variant: "caption",
-                                    }}
-                                  />
-                                </ListItem>
-                              ))}
-
-                            {routeDetails.steps.length < 5 &&
-                              Array.from({
-                                length: 5 - routeDetails.steps.length,
-                              }).map((_, index) => (
-                                <ListItem
-                                  key={`empty-${index}`}
-                                  divider={
-                                    index < 5 - routeDetails.steps.length - 1
-                                  }
-                                  sx={{ py: 1.5 }}
-                                >
-                                  <ListItemIcon
-                                    sx={{
-                                      minWidth: 36,
-                                      color: "rgba(255,255,255,0.2)",
-                                    }}
-                                  >
-                                    <NavigationIcon fontSize="small" />
-                                  </ListItemIcon>
-                                  <ListItemText
-                                    primary="End of route"
-                                    primaryTypographyProps={{
-                                      color: "rgba(255,255,255,0.3)",
-                                      variant: "body2",
-                                      fontStyle: "italic",
-                                    }}
-                                  />
-                                </ListItem>
-                              ))}
-                          </List>
-                        </Box>
-                        {routeDetails.steps.length > 5 && (
+                        <CardContent sx={{ flex: 1, p: 1.5 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 500, mb: 0.5 }}
+                          >
+                            {parking.name}
+                          </Typography>
                           <Typography
                             variant="caption"
                             sx={{
                               display: "block",
-                              textAlign: "center",
-                              mt: 1,
-                              color: "#bbbbbb",
-                              borderTop: "1px solid rgba(255,255,255,0.1)",
-                              pt: 1,
+                              color: "rgba(255,255,255,0.6)",
                             }}
                           >
-                            + {routeDetails.steps.length - 5} more steps to
-                            destination
+                            Distance to destination:{" "}
+                            {parking.distance_to_destination || "Unknown"} m
                           </Typography>
-                        )}
-                      </>
-                    )}
-                  </Paper>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              mt: 0.5,
+                            }}
+                          >
+                            <Tooltip title="Available Spots">
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  mr: 2,
+                                }}
+                              >
+                                <LocalParkingIcon
+                                  fontSize="small"
+                                  sx={{ mr: 0.5, fontSize: "0.875rem" }}
+                                />
+                                <Typography variant="caption">
+                                  {parking.available_spots}/
+                                  {parking.total_spots}
+                                </Typography>
+                              </Box>
+                            </Tooltip>
+                            <Tooltip title="Hourly Rate">
+                              <Box
+                                sx={{ display: "flex", alignItems: "center" }}
+                              >
+                                <PaidIcon
+                                  fontSize="small"
+                                  sx={{ mr: 0.5, fontSize: "0.875rem" }}
+                                />
+                                <Typography variant="caption">
+                                  ${parking.hourly_rate}/hr
+                                </Typography>
+                              </Box>
+                            </Tooltip>
+                          </Box>
+                        </CardContent>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            p: 1,
+                          }}
+                        >
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => handleArriveParking(parking)}
+                            sx={{
+                              fontSize: "0.7rem",
+                              py: 0.5,
+                              minWidth: "60px",
+                              backgroundColor: "#1A73E8",
+                              "&:hover": {
+                                backgroundColor: "#1765CC",
+                              },
+                            }}
+                          >
+                            Select
+                          </Button>
+                        </Box>
+                      </Card>
+                    </Grid>
+                  ))}
                 </Grid>
-              </Grid>
-            </Paper>
-          </Box>
-        )}
-
-        {activeStep === 2 && selectedDestination && (
-          <Box sx={{ p: 3, maxWidth: "800px", mx: "auto" }}>
-            <Paper sx={{ p: 3, mb: 3, bgcolor: "#1e1e1e", color: "white" }}>
-              <Typography variant="h5" gutterBottom>
-                Navigate to: {selectedDestination.name}
-              </Typography>
-              <Divider sx={{ mb: 2, bgcolor: "rgba(255,255,255,0.1)" }} />
-
-              <NavigationMap
-                origin={userLocation || { lat: -36.8508, lng: 174.7645 }}
-                destination={selectedDestination.location}
-                navigationProgress={navigationProgress}
-              />
-
-              <Box sx={{ mb: 2, mt: 2 }}>
-                <Typography variant="subtitle1">Navigation Info</Typography>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  From: Your Location
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  To: {selectedDestination.name}
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  Distance:{" "}
-                  {routeDetails?.distance ||
-                    `${Math.floor(Math.random() * 5) + 2} km`}
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  Estimated Time:{" "}
-                  {routeDetails?.duration ||
-                    `${Math.floor(Math.random() * 15) + 5} min`}
-                </Typography>
               </Box>
+            )}
 
+            {/* 停车场内UI - 移到中心悬浮窗 */}
+            {navigationProgress === "parking" && (
               <Box
                 sx={{
-                  mb: 2,
-                  mt: 3,
-                  p: 1,
-                  bgcolor: "rgba(0,0,0,0.2)",
-                  borderRadius: 1,
-                  position: "relative",
-                  overflow: "hidden",
-                  height: "24px",
+                  maxHeight: "calc(100vh - 220px)",
+                  overflowY: "auto",
+                  pr: 1,
+                  mr: -1,
                 }}
               >
-                <Box
-                  sx={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    height: "100%",
-                    width: `${navigationProgress}%`,
-                    bgcolor: "primary.main",
-                    transition: "width 0.3s ease-in-out",
-                  }}
-                />
+                <Typography
+                  variant="body2"
+                  gutterBottom
+                  sx={{ fontWeight: 500 }}
+                >
+                  Smart Parking Assistant
+                </Typography>
                 <Typography
                   variant="caption"
                   sx={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    width: "100%",
-                    height: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontWeight: "bold",
-                    zIndex: 1,
+                    display: "block",
+                    color: "rgba(255,255,255,0.7)",
+                    mb: 1,
                   }}
                 >
-                  DRIVING ({navigationProgress}%)
+                  AI has selected the best spot for you:
+                  {parkingLotDetails?.recommended_spot?.id || ""}
                 </Typography>
-              </Box>
-
-              <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                onClick={() =>
-                  handleArriveParking({
-                    id: `parking_${selectedDestination.id}`,
-                    name: `${selectedDestination.name} Parking`,
-                  })
-                }
-                disabled={navigationProgress < 100}
-              >
-                {navigationProgress < 100
-                  ? `Please Wait...`
-                  : "ARRIVED AT PARKING LOT"}
-              </Button>
-            </Paper>
-          </Box>
-        )}
-
-        {activeStep === 3 && parkingSpots && (
-          <Box sx={{ p: 3, maxWidth: "800px", mx: "auto" }}>
-            <Paper sx={{ p: 3, mb: 3, bgcolor: "#1e1e1e", color: "white" }}>
-              <Typography variant="h5" gutterBottom>
-                Find Parking Spot
-              </Typography>
-              <Divider sx={{ mb: 2, bgcolor: "rgba(255,255,255,0.1)" }} />
-
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Recommended Parking Spot: {parkingSpots.recommended_spot?.id}
-                </Typography>
-
-                <Box
+                <Button
+                  variant="contained"
+                  color="success"
+                  fullWidth
+                  onClick={completeParking}
                   sx={{
-                    height: "280px",
-                    bgcolor: "#333333",
-                    p: 2,
-                    borderRadius: 1,
-                    display: "grid",
-                    gridTemplateColumns: "repeat(12, 1fr)",
-                    gridTemplateRows: "repeat(6, 1fr)",
-                    gap: 1,
+                    mt: 1,
+                    mb: 1,
+                    py: 1,
+                    backgroundColor: "#34A853",
+                    "&:hover": {
+                      backgroundColor: "#2E8B57",
+                    },
                   }}
                 >
-                  {parkingSpots.spots &&
-                    Object.values(parkingSpots.spots).map((spot) => (
-                      <Box
-                        key={spot.id}
-                        sx={{
-                          gridColumn: spot.col + 1,
-                          gridRow: spot.row + 1,
-                          bgcolor: spot.is_occupied
-                            ? "error.dark"
-                            : spot.id === parkingSpots.recommended_spot?.id
-                            ? "success.main"
-                            : "success.dark",
-                          border:
-                            spot.id === parkingSpots.recommended_spot?.id
-                              ? "2px solid white"
-                              : "none",
-                          borderRadius: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "white",
-                          fontSize: "0.7rem",
-                          fontWeight:
-                            spot.id === parkingSpots.recommended_spot?.id
-                              ? "bold"
-                              : "normal",
-                        }}
-                      >
-                        {spot.id}
-                      </Box>
-                    ))}
-                </Box>
+                  Complete Parking
+                </Button>
               </Box>
+            )}
 
-              <Alert
-                severity="success"
-                icon={<LocalParkingIcon fontSize="inherit" />}
-                sx={{ mb: 2, bgcolor: "#0a3d12", color: "white" }}
-              >
-                System has reserved parking spot{" "}
-                {parkingSpots.recommended_spot?.id} for you, located near{" "}
-                {selectedDestination.name}.
-              </Alert>
-
-              <Typography variant="subtitle2" gutterBottom>
-                Navigation Instructions:
-              </Typography>
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • Enter the parking garage
-                </Typography>
-                {parkingSpots.recommended_spot && (
-                  <>
-                    <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                      • Go to level{" "}
-                      {Math.floor(
-                        (parkingSpots.recommended_spot?.row || 0) / 2
-                      ) + 1}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                      • Drive along the{" "}
-                      {(parkingSpots.recommended_spot?.row || 0) % 2 === 0
-                        ? "left"
-                        : "right"}{" "}
-                      side
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                      • Your spot is in section{" "}
-                      {String.fromCharCode(
-                        65 + (parkingSpots.recommended_spot?.row || 0)
-                      )}
-                    </Typography>
-                  </>
-                )}
-              </Box>
-
-              <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                onClick={completeParking}
-              >
-                Parking Complete
-              </Button>
-            </Paper>
-          </Box>
-        )}
-
-        {activeStep === 4 && isParked && (
-          <Box sx={{ p: 3, maxWidth: "800px", mx: "auto" }}>
-            <Paper sx={{ p: 3, mb: 3, bgcolor: "#1e1e1e", color: "white" }}>
-              <Box sx={{ textAlign: "center", mb: 3 }}>
-                <CheckCircleIcon
-                  sx={{ fontSize: 80, color: "success.main", mb: 2 }}
-                />
-                <Typography variant="h5" gutterBottom>
+            {/* 完成停车 */}
+            {navigationProgress === "completed" && (
+              <Box sx={{ textAlign: "center" }}>
+                <Typography
+                  variant="body1"
+                  gutterBottom
+                  sx={{ fontWeight: 500 }}
+                >
                   Parking Successful!
                 </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: "block",
+                    mb: 1,
+                    color: "rgba(255,255,255,0.7)",
+                  }}
+                >
+                  Your vehicle has been parked successfully
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="#34A853"
+                  paragraph
+                  sx={{ fontWeight: 500 }}
+                >
+                  Your parking spot:
+                  {parkingLotDetails?.recommended_spot?.id || ""}
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={resetNavigation}
+                  sx={{
+                    mt: 1,
+                    backgroundColor: "#1A73E8",
+                    "&:hover": {
+                      backgroundColor: "#1765CC",
+                    },
+                  }}
+                >
+                  Start New Trip
+                </Button>
               </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
 
-              <Alert
-                severity="info"
-                sx={{ mb: 3, bgcolor: "#0d3b54", color: "white" }}
-              >
-                Please remember your parking location:{" "}
-                {parkingSpots.recommended_spot?.id}
-              </Alert>
+      {/* 停车场俯视图悬浮窗 - 在地图中央显示 */}
+      {navigationProgress === "parking" && parkingLotDetails && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 4,
+            maxWidth: 600,
+            width: "80%",
+            maxHeight: "70vh",
+            backgroundColor: "rgba(32,33,36,0.9)",
+            backdropFilter: "blur(12px)",
+            borderRadius: 2,
+            p: 2,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+            display: { xs: "none", md: "block" },
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 2,
+            }}
+          >
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 500, color: "white" }}
+            >
+              Parking Lot View
+            </Typography>
+            <IconButton size="small" sx={{ color: "white" }} onClick={() => {}}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <ParkingLotView
+            parkingLot={parkingLotDetails}
+            vehiclePosition={vehiclePosition}
+            recommendedSpot={parkingLotDetails.recommended_spot}
+            onCompleteParking={completeParking}
+          />
+        </Box>
+      )}
 
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Parking Details:
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • Parking Facility: {selectedDestination.name} Parking
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • Parking Spot: {parkingSpots.recommended_spot?.id}
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • Time Started: {new Date().toLocaleTimeString()}
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#bbbbbb" }}>
-                  • Vehicle: {selectedVehicle?.name}
-                </Typography>
-              </Box>
-
-              <Alert
-                severity="warning"
-                sx={{ mb: 3, bgcolor: "#614d03", color: "white" }}
-              >
-                To help you find your vehicle later, we've saved your parking
-                location to your history.
-              </Alert>
-
+      {/* 固定在底部的控制栏 */}
+      {navigationProgress !== "idle" && (
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            bgcolor: "rgba(32,33,36,0.85)",
+            backdropFilter: "blur(12px)",
+            p: 1.5,
+            zIndex: 3,
+            boxShadow: "0 -2px 8px rgba(0,0,0,0.2)",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Button
+              variant="outlined"
+              startIcon={<CancelIcon />}
+              onClick={resetNavigation}
+              size="small"
+              sx={{
+                color: "white",
+                borderColor: "rgba(255,255,255,0.3)",
+                "&:hover": {
+                  borderColor: "white",
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                },
+              }}
+            >
+              Cancel
+            </Button>
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)" }}>
+              {navigationProgress === "navigating"
+                ? "Navigating to destination..."
+                : navigationProgress === "arrived"
+                ? "Please select a parking lot"
+                : navigationProgress === "parking"
+                ? "Finding the best parking spot..."
+                : "Parking complete"}
+            </Typography>
+            {navigationProgress === "navigating" && (
               <Button
                 variant="contained"
                 color="primary"
-                fullWidth
-                onClick={resetNavigation}
+                size="small"
+                onClick={() => setNavigationProgress("arrived")}
+                sx={{
+                  backgroundColor: "#1A73E8",
+                  "&:hover": {
+                    backgroundColor: "#1765CC",
+                  },
+                }}
               >
-                Return to Home
+                Simulate Arrival
               </Button>
-            </Paper>
+            )}
           </Box>
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-export default Dashboard;
-
-// NavigationMap组件用于显示导航地图和动态移动的标记
-function NavigationMap({ origin, destination, navigationProgress }) {
-  const mapRef = useRef(null);
-  const googleMapRef = useRef(null);
-  const routePolylineRef = useRef(null);
-  const markerRef = useRef(null);
-  const animationFrameRef = useRef(null);
-  const routePathRef = useRef([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [routeDetails, setRouteDetails] = useState(null);
-
-  // 初始化地图
-  const initMap = async () => {
-    if (!mapRef.current || !window.google || !window.google.maps) {
-      console.warn("Cannot initialize map: Google Maps not loaded");
-      setError("Cannot load map. Please check your network connection.");
-      return;
-    }
-
-    try {
-      // 创建地图实例
-      googleMapRef.current = new window.google.maps.Map(mapRef.current, {
-        zoom: 14,
-        center: origin,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-        mapId: "5a8d875e3485586f",
-        styles: [
-          {
-            featureType: "all",
-            elementType: "geometry",
-            stylers: [{ color: "#242f3e" }],
-          },
-          {
-            featureType: "all",
-            elementType: "labels.text.stroke",
-            stylers: [{ color: "#242f3e" }],
-          },
-          {
-            featureType: "all",
-            elementType: "labels.text.fill",
-            stylers: [{ color: "#746855" }],
-          },
-          {
-            featureType: "road",
-            elementType: "geometry",
-            stylers: [{ color: "#38414e" }],
-          },
-          {
-            featureType: "road",
-            elementType: "geometry.stroke",
-            stylers: [{ color: "#212a37" }],
-          },
-          {
-            featureType: "road",
-            elementType: "labels.text.fill",
-            stylers: [{ color: "#9ca5b3" }],
-          },
-          {
-            featureType: "water",
-            elementType: "geometry",
-            stylers: [{ color: "#17263c" }],
-          },
-        ],
-      });
-
-      // 计算并显示路线
-      await calculateAndDisplayRoute(origin, destination);
-    } catch (error) {
-      console.error("Map initialization error:", error);
-      setError("Failed to load map. Please refresh the page.");
-    }
-  };
-
-  // 计算和显示路线
-  const calculateAndDisplayRoute = async (origin, destination) => {
-    if (!googleMapRef.current) return;
-
-    setLoading(true);
-
-    try {
-      // 使用routesService计算路线
-      const routeResult = await routesService.calculateRoute(
-        origin,
-        destination
-      );
-      setRouteDetails(routeResult);
-
-      // 检查是否有编码的多段线路径
-      if (routeResult.encodedPolyline) {
-        // 使用Google Maps geometry库来解码多段线
-        if (
-          window.google.maps.geometry &&
-          window.google.maps.geometry.encoding
-        ) {
-          const path = google.maps.geometry.encoding.decodePath(
-            routeResult.encodedPolyline
-          );
-          routePathRef.current = path;
-
-          // 创建路线线条
-          if (routePolylineRef.current) {
-            routePolylineRef.current.setMap(null);
-          }
-
-          routePolylineRef.current = new window.google.maps.Polyline({
-            path: path,
-            geodesic: true,
-            strokeColor: "#4fc3f7",
-            strokeOpacity: 1.0,
-            strokeWeight: 4,
-          });
-
-          routePolylineRef.current.setMap(googleMapRef.current);
-
-          // 设置地图边界以显示整个路线
-          const bounds = new window.google.maps.LatLngBounds();
-          bounds.extend(origin);
-          bounds.extend(destination);
-          path.forEach((point) => bounds.extend(point));
-          googleMapRef.current.fitBounds(bounds);
-
-          // 创建起点和终点标记
-          addFixedMarkers(origin, destination);
-
-          // 创建会移动的红点标记
-          createMovingMarker(path[0]);
-
-          setLoading(false);
-        } else {
-          console.warn(
-            "Google Maps Geometry library not available for polyline decoding"
-          );
-          createStaticRoutePath(origin, destination);
-          setLoading(false);
-        }
-      } else if (routeResult.fromJSAPI && routeResult.rawResult) {
-        // 处理从JavaScript API返回的结果
-        const route = routeResult.rawResult.routes[0];
-        const path = route.overview_path;
-        routePathRef.current = path;
-
-        // 创建路线线条
-        if (routePolylineRef.current) {
-          routePolylineRef.current.setMap(null);
-        }
-
-        routePolylineRef.current = new window.google.maps.Polyline({
-          path: path,
-          geodesic: true,
-          strokeColor: "#4fc3f7",
-          strokeOpacity: 1.0,
-          strokeWeight: 4,
-        });
-
-        routePolylineRef.current.setMap(googleMapRef.current);
-
-        // 设置地图边界以显示整个路线
-        const bounds = new window.google.maps.LatLngBounds();
-        bounds.extend(origin);
-        bounds.extend(destination);
-        path.forEach((point) => bounds.extend(point));
-        googleMapRef.current.fitBounds(bounds);
-
-        // 创建起点和终点标记
-        addFixedMarkers(origin, destination);
-
-        // 创建会移动的红点标记
-        createMovingMarker(path[0]);
-
-        setLoading(false);
-      } else {
-        // 如果没有路线数据，使用静态路径
-        console.warn("No route data available, using static path");
-        createStaticRoutePath(origin, destination);
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error("Route calculation error:", error);
-      createStaticRoutePath(origin, destination);
-      setLoading(false);
-    }
-  };
-
-  // 创建静态路径（如果API不可用）
-  const createStaticRoutePath = (origin, destination) => {
-    try {
-      // 创建一条简单的直线作为路径
-      const simplePath = [
-        new window.google.maps.LatLng(origin.lat, origin.lng),
-        new window.google.maps.LatLng(destination.lat, destination.lng),
-      ];
-
-      routePathRef.current = simplePath;
-
-      if (routePolylineRef.current) {
-        routePolylineRef.current.setMap(null);
-      }
-
-      routePolylineRef.current = new window.google.maps.Polyline({
-        path: simplePath,
-        geodesic: true,
-        strokeColor: "#4fc3f7",
-        strokeOpacity: 1.0,
-        strokeWeight: 4,
-      });
-
-      routePolylineRef.current.setMap(googleMapRef.current);
-
-      // 设置地图边界
-      const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend(origin);
-      bounds.extend(destination);
-      googleMapRef.current.fitBounds(bounds);
-
-      // 添加固定标记
-      addFixedMarkers(origin, destination);
-
-      // 创建会移动的红点标记
-      createMovingMarker(simplePath[0]);
-    } catch (error) {
-      console.error("创建静态路线错误:", error);
-      setError("无法显示导航路线。请刷新页面重试。");
-    }
-  };
-
-  // 添加固定的起点和终点标记
-  const addFixedMarkers = (origin, destination) => {
-    // 添加起点标记
-    new window.google.maps.Marker({
-      position: origin,
-      map: googleMapRef.current,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 7,
-        fillColor: "#4CAF50",
-        fillOpacity: 1,
-        strokeWeight: 2,
-        strokeColor: "#FFFFFF",
-      },
-      zIndex: 1,
-    });
-
-    // 添加终点标记
-    new window.google.maps.Marker({
-      position: destination,
-      map: googleMapRef.current,
-      label: {
-        text: "D",
-        color: "#FFFFFF",
-        fontWeight: "bold",
-      },
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 9,
-        fillColor: "#F44336",
-        fillOpacity: 1,
-        strokeWeight: 2,
-        strokeColor: "#FFFFFF",
-      },
-      zIndex: 1,
-    });
-  };
-
-  // 创建移动的车辆标记
-  const createMovingMarker = (initialPosition) => {
-    if (markerRef.current) {
-      markerRef.current.setMap(null);
-    }
-
-    // 创建红点标记
-    markerRef.current = new window.google.maps.Marker({
-      position: initialPosition,
-      map: googleMapRef.current,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 6,
-        fillColor: "#FF4136",
-        fillOpacity: 1,
-        strokeWeight: 2,
-        strokeColor: "#FFFFFF",
-      },
-      zIndex: 2,
-      // 添加脉冲效果
-      animation: window.google.maps.Animation.BOUNCE,
-    });
-
-    // 停止动画效果，避免持续跳动
-    setTimeout(() => {
-      if (markerRef.current) {
-        markerRef.current.setAnimation(null);
-      }
-    }, 2000);
-  };
-
-  // 计算两点之间的角度
-  const calculateHeading = (point1, point2) => {
-    return window.google.maps.geometry.spherical.computeHeading(
-      new window.google.maps.LatLng(point1.lat(), point1.lng()),
-      new window.google.maps.LatLng(point2.lat(), point2.lng())
-    );
-  };
-
-  // 动画移动车辆标记
-  const startCarAnimation = () => {
-    const path = routePathRef.current;
-    if (!path || path.length < 2 || !markerRef.current) return;
-
-    // 清除之前的动画
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-
-    // 计算当前应该移动到的位置
-    const progress = navigationProgress / 100; // 0到1之间
-    const totalPathLength = path.length - 1;
-
-    const animate = () => {
-      // 计算当前位置
-      const currentProgress = navigationProgress / 100;
-
-      if (currentProgress >= 1) {
-        // 已到达终点
-        if (markerRef.current) {
-          markerRef.current.setPosition(path[path.length - 1]);
-        }
-        return;
-      }
-
-      // 计算当前应该在路径的哪个部分
-      const pathIndex = Math.min(
-        Math.floor(currentProgress * totalPathLength),
-        totalPathLength - 1
-      );
-
-      // 计算两点之间的位置
-      const segmentProgress = currentProgress * totalPathLength - pathIndex;
-
-      const currentPoint = path[pathIndex];
-      const nextPoint = path[pathIndex + 1];
-
-      // 计算当前位置（两点之间的插值）
-      const lat =
-        currentPoint.lat() +
-        (nextPoint.lat() - currentPoint.lat()) * segmentProgress;
-      const lng =
-        currentPoint.lng() +
-        (nextPoint.lng() - currentPoint.lng()) * segmentProgress;
-
-      // 更新标记位置
-      const newPosition = new window.google.maps.LatLng(lat, lng);
-      markerRef.current.setPosition(newPosition);
-
-      // 请求下一帧动画
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    // 启动动画
-    animate();
-  };
-
-  // 初始化地图
-  useEffect(() => {
-    initMap();
-
-    // 清理函数
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-
-      if (routePolylineRef.current) {
-        routePolylineRef.current.setMap(null);
-      }
-
-      if (markerRef.current) {
-        markerRef.current.setMap(null);
-      }
-    };
-  }, [origin, destination]);
-
-  // 根据导航进度更新车辆位置
-  useEffect(() => {
-    if (!loading && markerRef.current) {
-      startCarAnimation();
-    }
-  }, [navigationProgress, loading]);
-
-  return (
-    <Box
-      sx={{
-        position: "relative",
-        height: "300px",
-        bgcolor: "#333333",
-        borderRadius: 1,
-        overflow: "hidden",
-      }}
-    >
-      {loading && (
-        <Box
-          sx={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: "rgba(0,0,0,0.5)",
-            zIndex: 2,
-          }}
-        >
-          <CircularProgress color="primary" />
         </Box>
       )}
 
-      {error && (
-        <Box
-          sx={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: "rgba(0,0,0,0.5)",
-            zIndex: 2,
-            p: 2,
-          }}
-        >
-          <Alert severity="error" sx={{ width: "100%" }}>
-            {error}
-          </Alert>
-        </Box>
-      )}
-
-      <Box
-        ref={mapRef}
-        sx={{
-          height: "100%",
-          width: "100%",
-        }}
-      />
-
+      {/* 动态阶段图标 - 右上角 */}
       <Box
         sx={{
           position: "absolute",
-          bottom: 16,
-          right: 16,
-          bgcolor: "rgba(0,0,0,0.7)",
-          borderRadius: 1,
-          p: 1.5,
-          zIndex: 1,
+          top: 80,
+          right: 20,
+          backgroundColor: "rgba(32,33,36,0.75)",
+          backdropFilter: "blur(8px)",
+          borderRadius: "50%",
+          width: 48,
+          height: 48,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 5,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
         }}
       >
-        <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+        {navigationProgress === "idle" ? (
+          <PlaceIcon sx={{ color: "#FF4136", fontSize: 28 }} />
+        ) : navigationProgress === "navigating" ? (
+          <DirectionsCarIcon sx={{ color: "#1A73E8", fontSize: 28 }} />
+        ) : navigationProgress === "arrived" ? (
+          <LocalParkingIcon sx={{ color: "#FFDC00", fontSize: 28 }} />
+        ) : navigationProgress === "parking" ? (
+          <LocalParkingIcon sx={{ color: "#2ECC40", fontSize: 28 }} />
+        ) : (
+          <CheckCircleIcon sx={{ color: "#2ECC40", fontSize: 28 }} />
+        )}
+      </Box>
+
+      {/* 地图图例仍然保留在右下角，但更精简 */}
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: navigationProgress !== "idle" ? 80 : 20,
+          right: 20,
+          backgroundColor: "rgba(32,33,36,0.75)",
+          backdropFilter: "blur(8px)",
+          borderRadius: 1.5,
+          p: 1.5,
+          zIndex: 2,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+        }}
+      >
+        <Typography
+          variant="caption"
+          gutterBottom
+          sx={{ fontWeight: 500, color: "white", display: "block" }}
+        >
           Map Legend
         </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
           <Box
             sx={{
-              width: 12,
-              height: 12,
+              width: 10,
+              height: 10,
               borderRadius: "50%",
               bgcolor: "#4CAF50",
+              border: "2px solid white",
               mr: 1,
             }}
           />
           <Typography variant="caption" color="white">
-            Start
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-          <Box
-            sx={{
-              width: 12,
-              height: 12,
-              borderRadius: "50%",
-              bgcolor: "#F44336",
-              mr: 1,
-            }}
-          />
-          <Typography variant="caption" color="white">
-            Destination
+            Current Location
           </Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center" }}>
           <Box
             sx={{
-              width: 12,
-              height: 12,
+              width: 10,
+              height: 10,
               borderRadius: "50%",
               bgcolor: "#FF4136",
               border: "2px solid white",
@@ -1765,10 +1495,78 @@ function NavigationMap({ origin, destination, navigationProgress }) {
             }}
           />
           <Typography variant="caption" color="white">
-            Current Position
+            Destination
           </Typography>
         </Box>
       </Box>
+
+      {/* 到达目的地对话框 */}
+      {showArrivalDialog && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 10,
+            backgroundColor: "rgba(32,33,36,0.95)",
+            backdropFilter: "blur(12px)",
+            borderRadius: 2,
+            p: 3,
+            width: { xs: "90%", sm: 400 },
+            maxWidth: 450,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+            color: "white",
+            textAlign: "center",
+          }}
+        >
+          <CheckCircleIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
+
+          <Typography variant="h5" gutterBottom fontWeight={500}>
+            Destination Reached
+          </Typography>
+
+          <Typography variant="body1" paragraph>
+            You have arrived at {selectedDestination?.name}. Would you like to
+            use AI-guided parking assistance?
+          </Typography>
+
+          <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
+            <Button
+              variant="outlined"
+              onClick={skipAIParking}
+              sx={{
+                color: "white",
+                borderColor: "rgba(255,255,255,0.3)",
+                "&:hover": {
+                  borderColor: "white",
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                },
+                width: "48%",
+              }}
+            >
+              Skip
+            </Button>
+
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={enableAIParking}
+              sx={{
+                backgroundColor: "#1A73E8",
+                "&:hover": {
+                  backgroundColor: "#1765CC",
+                },
+                width: "48%",
+              }}
+            >
+              Enable AI Parking
+            </Button>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }
+
+export default Dashboard;
