@@ -27,6 +27,10 @@ import {
   LinearProgress,
   Chip,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -47,6 +51,9 @@ import DestinationSelector from "./DestinationSelector";
 import { api } from "../services/api";
 import routesService from "../services/routesService";
 import GoogleMap from "./GoogleMap"; // 导入新的GoogleMap组件
+import VideogameAssetIcon from "@mui/icons-material/VideogameAsset";
+import ParkingSimulator from "./ParkingSimulator";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 
 function Dashboard() {
   const { currentUser, accessToken, logout } = useAuth();
@@ -82,6 +89,11 @@ function Dashboard() {
   const animationTimerRef = useRef(null);
   const animationStartTimeRef = useRef(null);
   const animationDurationRef = useRef(5000); // 5秒动画时长
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [selectedLotId, setSelectedLotId] = useState(null);
+  const [selectedLot, setSelectedLot] = useState(null);
+  const [gameResults, setGameResults] = useState(null);
+  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     async function loadInitialData() {
@@ -707,6 +719,30 @@ function Dashboard() {
     googleMapsRef.current = mapInstance;
   };
 
+  // 处理打开模拟器
+  const handleOpenSimulator = (lot) => {
+    setSelectedLotId(lot.id);
+    setSelectedLot(lot);
+    setShowSimulator(true);
+  };
+
+  // 处理关闭模拟器
+  const handleCloseSimulator = (results) => {
+    setShowSimulator(false);
+
+    // 如果有游戏结果，显示结果对话框
+    if (results && !results.closed) {
+      setGameResults(results);
+      setShowResults(true);
+    }
+  };
+
+  // 处理游戏结果对话框关闭
+  const handleCloseResults = () => {
+    setShowResults(false);
+    setGameResults(null);
+  };
+
   if (loading) {
     return (
       <Box
@@ -1183,19 +1219,12 @@ function Dashboard() {
                         >
                           <Button
                             variant="contained"
-                            size="small"
-                            onClick={() => handleArriveParking(parking)}
-                            sx={{
-                              fontSize: "0.7rem",
-                              py: 0.5,
-                              minWidth: "60px",
-                              backgroundColor: "#1A73E8",
-                              "&:hover": {
-                                backgroundColor: "#1765CC",
-                              },
-                            }}
+                            color="secondary"
+                            onClick={() => handleOpenSimulator(parking)}
+                            className="select-btn"
+                            startIcon={<VideogameAssetIcon />}
                           >
-                            Select
+                            3D Simulator
                           </Button>
                         </Box>
                       </Card>
@@ -1588,6 +1617,75 @@ function Dashboard() {
           </Box>
         </Box>
       </Box>
+
+      {/* 添加停车模拟游戏 */}
+      <ParkingSimulator
+        open={showSimulator}
+        onClose={handleCloseSimulator}
+        parkingLotId={selectedLotId}
+        difficulty="medium"
+      />
+
+      {/* 游戏结果对话框 */}
+      <Dialog open={showResults} onClose={handleCloseResults}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <EmojiEventsIcon color="warning" />
+          Parking Simulation Results
+        </DialogTitle>
+        <DialogContent>
+          {gameResults && (
+            <Box sx={{ py: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Great job!
+              </Typography>
+              <Typography variant="body1" paragraph>
+                You successfully parked in spot {gameResults.spot?.id}.
+              </Typography>
+
+              <Box
+                sx={{ display: "flex", justifyContent: "space-between", my: 2 }}
+              >
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Time
+                  </Typography>
+                  <Typography variant="h6">
+                    {Math.floor(gameResults.timeElapsed / 60)}:
+                    {(gameResults.timeElapsed % 60).toString().padStart(2, "0")}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Score
+                  </Typography>
+                  <Typography variant="h6">{gameResults.score}</Typography>
+                </Box>
+              </Box>
+
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                Would you like to navigate to this parking lot?
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseResults}>Close</Button>
+          {selectedLot && (
+            <Button
+              variant="contained"
+              onClick={() => {
+                handleCloseResults();
+                if (typeof onSelectParkingLot === "function") {
+                  onSelectParkingLot(selectedLot);
+                }
+              }}
+            >
+              Navigate to This Parking
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
