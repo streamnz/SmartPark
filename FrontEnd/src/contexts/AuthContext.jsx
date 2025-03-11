@@ -25,8 +25,9 @@ export function AuthProvider({ children }) {
     const domain = getCurrentDomain();
     if (domain.includes("localhost")) {
       return "http://localhost:5001";
-    } else if (domain.includes("smartpark.streamnz.com")) {
-      return "https://smartpark.streamnz.com/api";
+    } else if (domain.includes("streamnz.com")) {
+      // 修改为正确的 API 域名
+      return "https://smartparking-api.streamnz.com";
     } else {
       // 默认情况
       return "http://localhost:5001";
