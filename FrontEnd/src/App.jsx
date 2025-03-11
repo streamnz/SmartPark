@@ -83,6 +83,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/authorize" element={<AuthCallback />} />
+            <Route path="/authorize/" element={<AuthCallback />} />
             <Route
               path="/dashboard"
               element={

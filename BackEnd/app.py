@@ -59,7 +59,22 @@ COGNITO_USER_POOL_ID = os.environ.get('COGNITO_USER_POOL_ID', 'ap-southeast-2_BX
 COGNITO_CLIENT_ID = os.environ.get('COGNITO_CLIENT_ID', '4r2ui82gb5gigfrfjl18tq1i6i')
 COGNITO_CLIENT_SECRET = os.environ.get('COGNITO_CLIENT_SECRET', 'h1bsjhhc0skjr9leug1tkru3upe4s1hsqj01qnbplhc2k6819c2')
 COGNITO_DOMAIN = f"https://ap-southeast-2bxhdowudl.auth.ap-southeast-2.amazoncognito.com"
-COGNITO_REDIRECT_URI = os.environ.get('COGNITO_REDIRECT_URI', 'http://localhost:5173/authorize')
+
+# 支持多个重定向 URI
+ALLOWED_REDIRECT_URIS = [
+    'http://localhost:5173/authorize',
+    'http://localhost:5173/authorize/',
+    'https://smartpark.streamnz.com/authorize',
+    'https://smartpark.streamnz.com/authorize/',
+    'https://www.smartpark.streamnz.com/authorize',
+    'https://www.smartpark.streamnz.com/authorize/'
+]
+
+# 动态获取重定向 URI
+def get_redirect_uri(request_uri=None):
+    if request_uri and request_uri in ALLOWED_REDIRECT_URIS:
+        return request_uri
+    return ALLOWED_REDIRECT_URIS[0]  # 默认使用第一个 URI
 
 # 配置OAuth
 oauth = OAuth(app)
@@ -119,76 +134,67 @@ def index():
 # Token exchange endpoint
 @app.route('/api/auth/token', methods=['POST'])
 def exchange_token():
-    if not request.is_json:
-        return jsonify({'error': 'Request must be in JSON format'}), 400
-        
-    code = request.json.get('code')
-    
-    if not code:
-        return jsonify({'error': 'Authorization code is required'}), 400
-    
-    # 从请求中获取redirect_uri，如果没有提供则使用默认值
-    redirect_uri = request.json.get('redirect_uri', COGNITO_REDIRECT_URI)
-    logger.info(f"Using redirect_uri: {redirect_uri}")
-    
     try:
-        token_endpoint = f'{COGNITO_DOMAIN}/oauth2/token'
+        data = request.get_json()
+        code = data.get('code')
+        redirect_uri = data.get('redirect_uri')
         
-        # 添加客户端认证
-        auth = (COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
+        if not code:
+            logger.error("Missing authorization code")
+            return jsonify({'error': 'Authorization code is required'}), 400
+            
+        # 验证重定向 URI
+        redirect_uri = get_redirect_uri(redirect_uri)
+        logger.info(f"Using redirect URI: {redirect_uri}")
         
-        payload = {
+        token_endpoint = f"{COGNITO_DOMAIN}/oauth2/token"
+        
+        # 准备 token 请求
+        token_data = {
             'grant_type': 'authorization_code',
+            'client_id': COGNITO_CLIENT_ID,
             'code': code,
-            'redirect_uri': redirect_uri  # 使用请求中提供的redirect_uri
+            'redirect_uri': redirect_uri
         }
         
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
+        auth = (COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
         
-        response = requests.post(
-            token_endpoint,
-            data=payload,
-            headers=headers,
-            auth=auth  # 使用基本认证
-        )
-        
-        # Print response info for debugging
-        logger.info(f"Token exchange response status: {response.status_code}")
-        logger.info(f"Token exchange response content: {response.text}")
+        # 发送 token 请求
+        logger.info("Sending token request to Cognito")
+        response = requests.post(token_endpoint, data=token_data, auth=auth, headers=headers)
         
         if response.status_code != 200:
             logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
-            return jsonify({'error': f'Token exchange failed: {response.status_code} - {response.text}'}), 400
-            
+            return jsonify({'error': 'Failed to exchange token', 'details': response.text}), response.status_code
+        
         tokens = response.json()
         
-        # Get user info
-        userinfo_endpoint = f'{COGNITO_DOMAIN}/oauth2/userInfo'
+        # 获取用户信息
         userinfo_response = requests.get(
-            userinfo_endpoint,
-            headers={'Authorization': f'Bearer {tokens["access_token"]}'}
+            f"{COGNITO_DOMAIN}/oauth2/userInfo",
+            headers={'Authorization': f"Bearer {tokens['access_token']}"}
         )
         
         if userinfo_response.status_code != 200:
-            logger.error(f"Failed to get user information: {userinfo_response.status_code} - {userinfo_response.text}")
-            return jsonify({'error': f'Failed to get user information: {userinfo_response.status_code} - {userinfo_response.text}'}), 400
-            
-        user_info = userinfo_response.json()
+            logger.error(f"Failed to get user info: {userinfo_response.status_code} - {userinfo_response.text}")
+            return jsonify({'error': 'Failed to get user information'}), userinfo_response.status_code
         
-        return jsonify({
+        # 合并令牌和用户信息
+        result = {
             'access_token': tokens['access_token'],
             'id_token': tokens.get('id_token'),
             'refresh_token': tokens.get('refresh_token'),
             'expires_in': tokens.get('expires_in'),
-            'user': user_info
-        })
+            'user': userinfo_response.json()
+        }
+        
+        logger.info("Token exchange successful")
+        return jsonify(result)
+        
     except Exception as e:
-        import traceback
-        logger.error(f"Error processing authorization code: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({'error': f'Error processing authorization code: {str(e)}'}), 500
+        logger.error(f"Token exchange error: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 # Protected user profile route
 @app.route('/api/user/profile')
@@ -228,7 +234,7 @@ def initiate_login():
         'client_id': COGNITO_CLIENT_ID,
         'response_type': 'code',
         'scope': 'email openid phone profile',  # 添加 scope
-        'redirect_uri': COGNITO_REDIRECT_URI    # 使用配置的 redirect_uri
+        'redirect_uri': get_redirect_uri()    # 使用配置的 redirect_uri
     }
     
     return redirect(f"{auth_url}?{urlencode(params)}")
@@ -243,7 +249,7 @@ def logout():
         logout_url = f"{COGNITO_DOMAIN}/logout"
         params = {
             'client_id': COGNITO_CLIENT_ID,
-            'logout_uri': COGNITO_REDIRECT_URI  # Redirect back to frontend after logout
+            'logout_uri': get_redirect_uri()  # Redirect back to frontend after logout
         }
         
         # Log the logout URL for debugging

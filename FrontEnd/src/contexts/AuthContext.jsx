@@ -83,46 +83,34 @@ export function AuthProvider({ children }) {
 
   // Login function - directly use Cognito URL
   const login = () => {
-    // 根据当前域名动态设置重定向URI
+    // 清除旧的授权状态
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user_data");
+    localStorage.removeItem("processed_auth_code");
+
     const redirectUri = `${getCurrentDomain()}/authorize`;
 
+    // 使用正确的 Cognito 域名
     const authorizationUrl =
       `https://ap-southeast-2bxhdowudl.auth.ap-southeast-2.amazoncognito.com/login?` +
-      `client_id=4r2ui82gb5gigfrfjl18tq1i6i&` +
+      `client_id=${cognitoConfig.clientId}&` +
       `response_type=code&` +
+      `scope=${encodeURIComponent(cognitoConfig.scope)}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-    console.log("Redirecting to:", authorizationUrl);
+    console.log("重定向到登录页:", authorizationUrl);
     window.location.href = authorizationUrl;
   };
 
   // Handle OAuth callback
   const handleAuthCallback = async (code) => {
-    // 使用全局变量存储正在处理的代码
-    const PROCESSING_KEY = "auth_code_processing";
-
-    // 检查是否已经处理过该代码
-    const processedCode = localStorage.getItem("processed_auth_code");
-    if (processedCode === code) {
-      console.log("此授权码已处理过，跳过");
-      return true; // 返回 true 避免导航问题
-    }
-
-    // 检查是否有正在处理的请求
-    if (localStorage.getItem(PROCESSING_KEY) === code) {
-      console.log("此授权码正在处理中，跳过");
-      return false;
-    }
-
     try {
-      // 标记为正在处理
-      localStorage.setItem(PROCESSING_KEY, code);
       setProcessingAuth(true);
       setLoading(true);
 
-      console.log("开始处理新授权码:", code);
+      console.log("开始处理授权码:", code);
 
-      // 根据当前域名获取API基础URL
+      // 获取API基础URL
       const apiBaseUrl = getApiBaseUrl();
       const tokenEndpoint = `${apiBaseUrl}/api/auth/token`;
 
@@ -130,29 +118,43 @@ export function AuthProvider({ children }) {
         tokenEndpoint,
         {
           code,
-          redirect_uri: `${getCurrentDomain()}/authorize`, // 添加重定向URI到请求中
+          redirect_uri: `${getCurrentDomain()}/authorize`,
         },
         {
           headers: { "Content-Type": "application/json" },
-          // 添加防止重复请求的标识
-          signal: AbortSignal.timeout(10000), // 10秒超时
         }
       );
 
       if (response.data.access_token) {
+        // 保存令牌和用户信息到本地存储
+        localStorage.setItem("auth_token", response.data.access_token);
+        if (response.data.user) {
+          localStorage.setItem("user_data", JSON.stringify(response.data.user));
+        }
+
+        // 更新状态
         setCurrentUser(response.data.user);
         setAccessToken(response.data.access_token);
-        // 保存已处理的代码
+
+        // 记录处理成功的授权码
         localStorage.setItem("processed_auth_code", code);
+
         return true;
       }
+
+      console.error(
+        "Token exchange response missing access_token:",
+        response.data
+      );
       return false;
     } catch (error) {
       console.error("Token交换错误:", error);
+      // 清除可能存在的无效数据
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user_data");
+      localStorage.removeItem("processed_auth_code");
       return false;
     } finally {
-      // 清除处理状态
-      localStorage.removeItem(PROCESSING_KEY);
       setProcessingAuth(false);
       setLoading(false);
     }
