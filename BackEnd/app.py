@@ -65,9 +65,7 @@ ALLOWED_REDIRECT_URIS = [
     'http://localhost:5173/authorize',
     'http://localhost:5173/authorize/',
     'https://smartpark.streamnz.com/authorize',
-    'https://smartpark.streamnz.com/authorize/',
-    'https://www.smartpark.streamnz.com/authorize',
-    'https://www.smartpark.streamnz.com/authorize/'
+    'https://smartpark.streamnz.com/authorize/'
 ]
 
 # 动态获取重定向 URI
@@ -132,8 +130,12 @@ def index():
     })
 
 # Token exchange endpoint
-@app.route('/api/auth/token', methods=['POST'])
+@app.route('/api/auth/token', methods=['POST', 'OPTIONS'])
 def exchange_token():
+    # 处理 OPTIONS 预检请求
+    if request.method == 'OPTIONS':
+        return '', 204
+        
     try:
         data = request.get_json()
         code = data.get('code')
