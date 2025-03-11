@@ -23,19 +23,6 @@ const getApiKey = () => {
   return "AIzaSyB9g1LcaQTtNj0xQIHqugH_zfFCndrxbBw";
 };
 
-// 获取API基础URL
-const getApiBaseUrl = () => {
-  const domain = window.location.origin;
-  if (domain.includes("localhost")) {
-    return "http://localhost:5001/api";
-  } else if (domain.includes("smartpark.streamnz.com")) {
-    return "https://smartparking-api.streamnz.com/api"; // 修正为正确的API域名
-  } else {
-    // 默认情况
-    return "http://localhost:5001/api";
-  }
-};
-
 // 用于模拟数据的函数（仅在API不可用时使用）
 const getMockSearchResults = (query) => {
   console.log("使用模拟搜索数据");

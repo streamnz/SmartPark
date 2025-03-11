@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
     if (domain.includes("localhost")) {
       return "http://localhost:5001";
     } else if (domain.includes("smartpark.streamnz.com")) {
-      return "https://smartparking-api.streamnz.com";
+      return "https://smartpark.streamnz.com/api";
     } else {
       // 默认情况
       return "http://localhost:5001";

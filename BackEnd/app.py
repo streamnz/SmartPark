@@ -100,6 +100,10 @@ def exchange_token():
     if not code:
         return jsonify({'error': 'Authorization code is required'}), 400
     
+    # 从请求中获取redirect_uri，如果没有提供则使用默认值
+    redirect_uri = request.json.get('redirect_uri', COGNITO_REDIRECT_URI)
+    logger.info(f"Using redirect_uri: {redirect_uri}")
+    
     try:
         token_endpoint = f'{COGNITO_DOMAIN}/oauth2/token'
         
@@ -109,7 +113,7 @@ def exchange_token():
         payload = {
             'grant_type': 'authorization_code',
             'code': code,
-            'redirect_uri': COGNITO_REDIRECT_URI
+            'redirect_uri': redirect_uri  # 使用请求中提供的redirect_uri
         }
         
         headers = {
