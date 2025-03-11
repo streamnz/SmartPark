@@ -15,12 +15,30 @@ export function AuthProvider({ children }) {
   const [processingAuth, setProcessingAuth] = useState(false);
   const navigate = useNavigate();
 
+  // 获取当前域名，用于动态设置回调URL
+  const getCurrentDomain = () => {
+    return window.location.origin;
+  };
+
+  // 获取API基础URL
+  const getApiBaseUrl = () => {
+    const domain = getCurrentDomain();
+    if (domain.includes("localhost")) {
+      return "http://localhost:5001";
+    } else if (domain.includes("smartpark.streamnz.com")) {
+      return "https://smartparking-api.streamnz.com";
+    } else {
+      // 默认情况
+      return "http://localhost:5001";
+    }
+  };
+
   // 配置
   const cognitoConfig = {
     clientId: "4r2ui82gb5gigfrfjl18tq1i6i",
     authority:
       "https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_BXhdoWuDl",
-    redirectUri: window.location.origin + "/authorize",
+    redirectUri: `${getCurrentDomain()}/authorize`,
     scope: "email openid phone",
   };
 
@@ -65,7 +83,8 @@ export function AuthProvider({ children }) {
 
   // Login function - directly use Cognito URL
   const login = () => {
-    const redirectUri = "http://localhost:5173/authorize";
+    // 根据当前域名动态设置重定向URI
+    const redirectUri = `${getCurrentDomain()}/authorize`;
 
     const authorizationUrl =
       `https://ap-southeast-2bxhdowudl.auth.ap-southeast-2.amazoncognito.com/login?` +
@@ -103,9 +122,16 @@ export function AuthProvider({ children }) {
 
       console.log("开始处理新授权码:", code);
 
+      // 根据当前域名获取API基础URL
+      const apiBaseUrl = getApiBaseUrl();
+      const tokenEndpoint = `${apiBaseUrl}/api/auth/token`;
+
       const response = await axios.post(
-        "http://localhost:5001/api/auth/token",
-        { code },
+        tokenEndpoint,
+        {
+          code,
+          redirect_uri: `${getCurrentDomain()}/authorize`, // 添加重定向URI到请求中
+        },
         {
           headers: { "Content-Type": "application/json" },
           // 添加防止重复请求的标识
@@ -143,11 +169,14 @@ export function AuthProvider({ children }) {
     localStorage.clear();
     sessionStorage.clear(); // 添加这行，清除 session storage
 
+    // 根据当前域名动态设置登出重定向URI
+    const logoutRedirectUri = getCurrentDomain();
+
     // 构建登出 URL
     const logoutUrl =
       `https://ap-southeast-2bxhdowudl.auth.ap-southeast-2.amazoncognito.com/logout?` +
       `client_id=4r2ui82gb5gigfrfjl18tq1i6i&` +
-      `logout_uri=${encodeURIComponent("http://localhost:5173")}&` +
+      `logout_uri=${encodeURIComponent(logoutRedirectUri)}&` +
       `response_type=token`; // 添加响应类型
 
     // 重定向到登出页面
