@@ -426,142 +426,467 @@ function ParkingSpotHighlight({ spot, isTarget }) {
   );
 }
 
-// 加载界面
-function Loader() {
-  return (
-    <Html center>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          p: 3,
-          borderRadius: 2,
-          bgcolor: "rgba(0,0,0,0.7)",
-          boxShadow: 3,
-        }}
-      >
-        <CircularProgress size={60} sx={{ color: "white" }} />
-        <Typography variant="body1" sx={{ color: "white", mt: 2 }}>
-          Loading 3D Environment...
-        </Typography>
-      </Box>
-    </Html>
-  );
-}
-
-// 游戏完成消息
-function GameCompleteMessage({ onRestart, onClose }) {
-  return (
-    <Html center>
-      <Paper
-        elevation={10}
-        sx={{
-          p: 4,
-          borderRadius: 2,
-          bgcolor: "rgba(0,0,0,0.85)",
-          color: "white",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          maxWidth: 350,
-          backdropFilter: "blur(8px)",
-        }}
-      >
-        <Typography variant="h5" gutterBottom sx={{ color: "#4caf50" }}>
-          Perfect Parking!
-        </Typography>
-        <Typography variant="body1" sx={{ mb: 3, textAlign: "center" }}>
-          You've successfully parked your car in the designated spot.
-        </Typography>
-
-        <Box sx={{ display: "flex", gap: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<RestartAltIcon />}
-            onClick={onRestart}
-          >
-            Try Again
-          </Button>
-          <Button
-            variant="outlined"
-            sx={{ color: "white", borderColor: "white" }}
-            onClick={onClose}
-          >
-            Close
-          </Button>
-        </Box>
-      </Paper>
-    </Html>
-  );
-}
-
 // 游戏指导说明
 function GameInstructions({ onClose }) {
   return (
-    <Html center>
-      <Paper
-        elevation={10}
-        sx={{
-          p: 4,
-          borderRadius: 2,
-          bgcolor: "rgba(0,0,0,0.85)",
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0,0,0,0.7)",
+        zIndex: 999,
+        backdropFilter: "blur(5px)",
+        transition: "all 0.3s ease-in-out",
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: "#222",
           color: "white",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          maxWidth: 400,
-          backdropFilter: "blur(8px)",
+          padding: "2.5rem",
+          borderRadius: "16px",
+          maxWidth: "460px",
+          width: "80%",
+          position: "relative",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          animation: "fadeInUp 0.5s ease-out",
         }}
       >
-        <Typography variant="h5" gutterBottom sx={{ color: "#2196f3" }}>
-          3D Parking Simulator
-        </Typography>
-        <Typography variant="body1" paragraph>
+        <div
+          style={{
+            position: "absolute",
+            top: "15px",
+            right: "15px",
+            cursor: "pointer",
+            fontSize: "24px",
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(255,255,255,0.1)",
+            transition: "all 0.2s",
+          }}
+          onClick={onClose}
+          onMouseOver={(e) =>
+            (e.currentTarget.style.background = "rgba(255,255,255,0.2)")
+          }
+          onMouseOut={(e) =>
+            (e.currentTarget.style.background = "rgba(255,255,255,0.1)")
+          }
+        >
+          ×
+        </div>
+
+        <h2
+          style={{
+            color: "#4fc3f7",
+            fontSize: "32px",
+            margin: "0 0 25px 0",
+            textAlign: "center",
+            fontWeight: "700",
+            textShadow: "0 2px 10px rgba(79, 195, 247, 0.5)",
+            letterSpacing: "1px",
+            lineHeight: "1.2",
+          }}
+        >
+          3D
+          <br />
+          Parking
+          <br />
+          Simulator
+        </h2>
+
+        <p
+          style={{
+            margin: "0 0 25px 0",
+            lineHeight: "1.6",
+            color: "rgba(255,255,255,0.9)",
+            fontSize: "16px",
+            textAlign: "center",
+          }}
+        >
           Experience what it's like to navigate and park at this location.
-        </Typography>
-        <Typography variant="body2" sx={{ mb: 1, alignSelf: "flex-start" }}>
+        </p>
+
+        <h3
+          style={{
+            fontSize: "18px",
+            margin: "0 0 15px 0",
+            color: "rgba(255,255,255,0.95)",
+            fontWeight: "600",
+            borderLeft: "3px solid #4fc3f7",
+            paddingLeft: "10px",
+          }}
+        >
           How to play:
-        </Typography>
-        <ul style={{ margin: 0, paddingLeft: 24 }}>
-          <li>
-            <Typography variant="body2">
-              Click anywhere on the parking lot roads to drive
-            </Typography>
+        </h3>
+
+        <ul
+          style={{
+            paddingLeft: "25px",
+            marginBottom: "30px",
+            color: "rgba(255,255,255,0.85)",
+            fontSize: "15px",
+            lineHeight: "1.7",
+          }}
+        >
+          <li style={{ marginBottom: "12px" }}>
+            <span style={{ color: "#4fc3f7", fontWeight: "bold" }}>Click</span>{" "}
+            anywhere on the parking lot roads to drive
           </li>
-          <li>
-            <Typography variant="body2">
-              Navigate to the highlighted parking spot
-            </Typography>
+          <li style={{ marginBottom: "12px" }}>
+            <span style={{ color: "#4fc3f7", fontWeight: "bold" }}>
+              Navigate
+            </span>{" "}
+            to the highlighted parking spot
           </li>
-          <li>
-            <Typography variant="body2">
-              Rotate the view using mouse drag or touch
-            </Typography>
+          <li style={{ marginBottom: "12px" }}>
+            <span style={{ color: "#4fc3f7", fontWeight: "bold" }}>Rotate</span>{" "}
+            the view using mouse drag or touch
           </li>
-          <li>
-            <Typography variant="body2">
-              Zoom in/out with mouse wheel or pinch
-            </Typography>
+          <li style={{ marginBottom: "12px" }}>
+            <span style={{ color: "#4fc3f7", fontWeight: "bold" }}>Zoom</span>{" "}
+            in/out with mouse wheel or pinch
           </li>
         </ul>
-        <Button variant="contained" sx={{ mt: 3 }} onClick={onClose}>
-          Start Game
-        </Button>
-      </Paper>
-    </Html>
+
+        <button
+          style={{
+            backgroundColor: "#2196F3",
+            color: "white",
+            border: "none",
+            padding: "14px 20px",
+            borderRadius: "8px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            width: "100%",
+            boxShadow: "0 4px 20px rgba(33,150,243,0.4)",
+            backgroundImage: "linear-gradient(to right, #2196F3, #21CBF3)",
+            textTransform: "uppercase",
+            letterSpacing: "2px",
+            transition: "all 0.3s ease",
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = "0 6px 25px rgba(33,150,243,0.6)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 4px 20px rgba(33,150,243,0.4)";
+          }}
+          onClick={onClose}
+        >
+          START GAME
+        </button>
+
+        <style>
+          {`
+            @keyframes fadeInUp {
+              from {
+                opacity: 0;
+                transform: translateY(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+          `}
+        </style>
+      </div>
+    </div>
+  );
+}
+
+// 游戏完成消息组件 - 作为普通React组件
+function GameCompleteMessage({ onRestart, onClose, score, time }) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0,0,0,0.7)",
+        backdropFilter: "blur(5px)",
+        zIndex: 999,
+        animation: "fadeIn 0.5s ease-out",
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: "rgba(16, 24, 32, 0.95)",
+          color: "white",
+          padding: "2.5rem",
+          borderRadius: "16px",
+          width: "90%",
+          maxWidth: "400px",
+          boxShadow: "0 15px 30px rgba(0,0,0,0.6)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          animation: "bounceIn 0.6s ease-out",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            width: "80px",
+            height: "80px",
+            borderRadius: "50%",
+            backgroundColor: "rgba(76, 175, 80, 0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 20px auto",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "40px",
+              color: "#4caf50",
+            }}
+          >
+            ✓
+          </div>
+        </div>
+
+        <h2
+          style={{
+            color: "#4caf50",
+            fontSize: "28px",
+            margin: "0 0 15px 0",
+            fontWeight: "700",
+            textShadow: "0 2px 10px rgba(76, 175, 80, 0.3)",
+          }}
+        >
+          Perfect Parking!
+        </h2>
+
+        <p
+          style={{
+            margin: "0 0 25px 0",
+            fontSize: "16px",
+            color: "rgba(255,255,255,0.8)",
+            lineHeight: "1.6",
+          }}
+        >
+          You've successfully parked your car in the designated spot.
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            margin: "30px 0",
+            backgroundColor: "rgba(255,255,255,0.05)",
+            padding: "15px",
+            borderRadius: "8px",
+          }}
+        >
+          <div style={{ textAlign: "center", flex: 1 }}>
+            <div
+              style={{
+                fontSize: "14px",
+                color: "rgba(255,255,255,0.6)",
+                marginBottom: "5px",
+              }}
+            >
+              TIME
+            </div>
+            <div
+              style={{ fontSize: "24px", fontWeight: "bold", color: "#64b5f6" }}
+            >
+              {time || "45"}s
+            </div>
+          </div>
+
+          <div
+            style={{
+              textAlign: "center",
+              flex: 1,
+              borderLeft: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "14px",
+                color: "rgba(255,255,255,0.6)",
+                marginBottom: "5px",
+              }}
+            >
+              SCORE
+            </div>
+            <div
+              style={{ fontSize: "24px", fontWeight: "bold", color: "#ffb74d" }}
+            >
+              {score || "92"}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: "15px",
+            justifyContent: "center",
+            marginTop: "20px",
+          }}
+        >
+          <button
+            style={{
+              padding: "12px 20px",
+              backgroundColor: "#4caf50",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "14px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              boxShadow: "0 4px 12px rgba(76, 175, 80, 0.3)",
+              transition: "all 0.2s",
+            }}
+            onClick={onRestart}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow =
+                "0 6px 15px rgba(76, 175, 80, 0.4)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow =
+                "0 4px 12px rgba(76, 175, 80, 0.3)";
+            }}
+          >
+            <span style={{ fontSize: "18px" }}>↺</span> Try Again
+          </button>
+
+          <button
+            style={{
+              padding: "12px 20px",
+              backgroundColor: "transparent",
+              color: "white",
+              border: "1px solid rgba(255,255,255,0.3)",
+              borderRadius: "8px",
+              fontSize: "14px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+            onClick={onClose}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+            }}
+          >
+            Close
+          </button>
+        </div>
+
+        <style>
+          {`
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+            
+            @keyframes bounceIn {
+              0% {
+                opacity: 0;
+                transform: scale(0.8);
+              }
+              70% {
+                opacity: 1;
+                transform: scale(1.05);
+              }
+              100% {
+                transform: scale(1);
+              }
+            }
+          `}
+        </style>
+      </div>
+    </div>
+  );
+}
+
+// 加载器组件优化
+function Loader() {
+  return (
+    <mesh visible position={[0, 0, 0]}>
+      <Html center>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "white",
+            background: "rgba(0,0,0,0.7)",
+            padding: "20px 30px",
+            borderRadius: "10px",
+            backdropFilter: "blur(5px)",
+          }}
+        >
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              border: "3px solid rgba(255,255,255,0.1)",
+              borderTopColor: "#4fc3f7",
+              animation: "spin 1s linear infinite",
+              marginBottom: "15px",
+            }}
+          ></div>
+          <div style={{ fontWeight: "bold" }}>Loading 3D Models...</div>
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </Html>
+    </mesh>
   );
 }
 
 // 改进的3D场景组件
-function Scene({ difficulty = "medium", onGameComplete, onRetry }) {
+function Scene({
+  difficulty = "medium",
+  onGameComplete,
+  onRetry,
+  gameStarted,
+  onModelsLoaded,
+}) {
   const carRef = useRef(null);
   const [targetPosition, setTargetPosition] = useState(null);
   const [carInitialized, setCarInitialized] = useState(false);
   const [parkingLotLoaded, setParkingLotLoaded] = useState(false);
   const [parkingBounds, setParkingBounds] = useState(null);
-  const [showInstructions, setShowInstructions] = useState(true);
   const [gameComplete, setGameComplete] = useState(false);
   const [targetSpot, setTargetSpot] = useState(null);
   const [targetSpotReached, setTargetSpotReached] = useState(false);
@@ -600,9 +925,10 @@ function Scene({ difficulty = "medium", onGameComplete, onRetry }) {
     };
   }, [camera, difficulty]);
 
-  // 启动游戏计时器
+  // 启动游戏计时器 - 修改为使用 gameStarted 属性
   useEffect(() => {
-    if (!showInstructions && !gameComplete && !timerRef.current) {
+    // 当游戏启动且没有计时器时开始计时
+    if (gameStarted && !gameComplete && !timerRef.current) {
       setGameStartTime(Date.now());
 
       timerRef.current = setInterval(() => {
@@ -618,7 +944,7 @@ function Scene({ difficulty = "medium", onGameComplete, onRetry }) {
         timerRef.current = null;
       }
     };
-  }, [showInstructions, gameComplete, gameStartTime]);
+  }, [gameStarted, gameComplete, gameStartTime]);
 
   // 处理停车场模型加载完成
   const handleParkingLotLoaded = (bounds) => {
@@ -637,6 +963,11 @@ function Scene({ difficulty = "medium", onGameComplete, onRetry }) {
         center.z + size.y * 1.5 // 调整z位置，使相机看向模型中心
       );
       camera.lookAt(center.x, 0, center.z);
+    }
+
+    // 通知模型加载完成
+    if (onModelsLoaded) {
+      onModelsLoaded();
     }
   };
 
@@ -744,9 +1075,6 @@ function Scene({ difficulty = "medium", onGameComplete, onRetry }) {
       }
     }
 
-    // 显示指导说明
-    setShowInstructions(true);
-
     // 如果有回调，则调用
     if (onRetry) onRetry();
   };
@@ -807,31 +1135,8 @@ function Scene({ difficulty = "medium", onGameComplete, onRetry }) {
       {/* 汽车 - 上移位置以适应旋转后的模型 */}
       <Car ref={carRef} position={[0, 0.5, 10]} scale={0.5} />
 
-      {/* 游戏完成消息 */}
-      {gameComplete && (
-        <GameCompleteMessage
-          onRestart={handleRetry}
-          onClose={() => {
-            if (onGameComplete) {
-              onGameComplete({
-                timeElapsed: elapsedTime,
-                spot: targetSpot,
-                score: calculateScore(elapsedTime, difficulty),
-                difficulty,
-                closed: true,
-              });
-            }
-          }}
-        />
-      )}
-
-      {/* 游戏说明 */}
-      {showInstructions && (
-        <GameInstructions onClose={() => setShowInstructions(false)} />
-      )}
-
       {/* 游戏UI - 计时器和目标 */}
-      {!showInstructions && !gameComplete && (
+      {gameStarted && !gameComplete && (
         <Html
           position={[0, 0, 0]}
           style={{
@@ -884,82 +1189,144 @@ export default function ParkingSimulator({
   parkingLotId = "default",
   difficulty = "medium", // easy, medium, hard
 }) {
-  const [gameResults, setGameResults] = useState(null);
+  const [showInstructions, setShowInstructions] = useState(true);
+  const [gameResult, setGameResult] = useState(null);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // 在模型加载完成后调用
+  const handleModelsLoaded = useCallback(() => {
+    setLoading(false);
+  }, []);
 
   const handleGameComplete = (results) => {
-    setGameResults(results);
-
-    // 如果用户关闭模拟器，传递结果
-    if (results && results.closed) {
-      if (onClose) onClose(gameResults);
+    setGameResult(results);
+    if (onClose) {
+      setTimeout(() => {
+        onClose(results);
+      }, 500); // 添加延迟使动画更流畅
     }
   };
 
   const handleRetry = () => {
-    setGameResults(null);
+    setGameResult(null);
+    setShowInstructions(true);
+    setGameStarted(false);
   };
+
+  const handleStartGame = () => {
+    setShowInstructions(false);
+    setGameStarted(true);
+  };
+
+  useEffect(() => {
+    // 组件卸载时清理
+    return () => {
+      setGameResult(null);
+      setShowInstructions(true);
+      setGameStarted(false);
+    };
+  }, []);
 
   if (!open) return null;
 
   return (
-    <Dialog
-      open={open}
-      onClose={() => onClose && onClose(gameResults)}
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        style: {
-          borderRadius: 10,
-          backgroundColor: "#1a1a1a",
-          height: "80vh",
-          margin: 0,
-          overflow: "hidden",
-        },
+    <div
+      style={{
+        width: "100%",
+        height: "600px",
+        position: "relative",
+        borderRadius: "12px",
+        overflow: "hidden",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
       }}
     >
-      <DialogTitle
-        sx={{
-          m: 0,
-          p: 2,
-          backgroundColor: "#000",
+      {/* 游戏说明浮层 - 确保在Canvas外渲染 */}
+      {showInstructions && <GameInstructions onClose={handleStartGame} />}
+
+      {/* 游戏完成浮层 - 确保在Canvas外渲染 */}
+      {gameResult && (
+        <GameCompleteMessage
+          onRestart={handleRetry}
+          onClose={() => onClose && onClose(gameResult)}
+          score={gameResult.score}
+          time={gameResult.time}
+        />
+      )}
+
+      {/* Three.js Canvas */}
+      <Canvas
+        shadows
+        dpr={[1, 2]}
+        gl={{ antialias: true, alpha: false }}
+        style={{
+          background: "linear-gradient(to bottom, #87ceeb 0%, #e0f7fa 100%)",
+          borderRadius: "12px",
+        }}
+        camera={{ position: [10, 10, 10], fov: 50 }}
+        performance={{ min: 0.5 }}
+      >
+        <fog attach="fog" args={["#87ceeb", 30, 100]} />
+        <Suspense fallback={<Loader />}>
+          <Scene
+            difficulty={difficulty}
+            onGameComplete={handleGameComplete}
+            onRetry={handleRetry}
+            gameStarted={gameStarted}
+            onModelsLoaded={handleModelsLoaded}
+          />
+        </Suspense>
+      </Canvas>
+
+      {/* 版权信息 */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "10px",
+          right: "15px",
           color: "white",
+          fontSize: "11px",
+          opacity: 0.6,
+          textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+          pointerEvents: "none",
+        }}
+      >
+        © SmartPark Simulator
+      </div>
+
+      {/* 关闭按钮 */}
+      <div
+        style={{
+          position: "absolute",
+          top: "15px",
+          right: "15px",
+          width: "36px",
+          height: "36px",
+          borderRadius: "50%",
+          backgroundColor: "rgba(0,0,0,0.4)",
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+          fontSize: "18px",
+          cursor: "pointer",
+          zIndex: 10,
+          transition: "all 0.2s ease",
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+        }}
+        onClick={() => onClose && onClose()}
+        onMouseOver={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.6)";
+          e.currentTarget.style.transform = "scale(1.1)";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.4)";
+          e.currentTarget.style.transform = "scale(1)";
         }}
       >
-        <Typography variant="h6" component="div">
-          3D Parking Simulator
-        </Typography>
-        <IconButton
-          aria-label="close"
-          onClick={() => onClose && onClose(gameResults)}
-          sx={{
-            color: "white",
-          }}
-        >
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent
-        sx={{
-          p: 0,
-          backgroundColor: "#000",
-          height: "100%",
-        }}
-      >
-        <div style={{ width: "100%", height: "100%", position: "relative" }}>
-          <Canvas shadows camera={{ position: [5, 15, 20], fov: 50 }}>
-            <Suspense fallback={<Loader />}>
-              <Scene
-                difficulty={difficulty}
-                onGameComplete={handleGameComplete}
-                onRetry={handleRetry}
-              />
-            </Suspense>
-          </Canvas>
-        </div>
-      </DialogContent>
-    </Dialog>
+        ×
+      </div>
+    </div>
   );
 }
