@@ -23,8 +23,35 @@ app = Flask(__name__)
 # 从环境变量获取密钥，如果不存在则生成一个（仅用于开发环境）
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
-# 配置CORS - 在生产环境中应该限制origins
-CORS(app, resources={r"/api/*": {"origins": os.environ.get('ALLOWED_ORIGINS', '*')}})
+# 配置CORS - 更新为允许特定域名和凭证
+ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5173,https://smartpark.streamnz.com')
+origins = ALLOWED_ORIGINS.split(',')
+logger.info(f"Configuring CORS with allowed origins: {origins}")
+
+# 应用CORS到整个应用，而不仅仅是/api/*路由
+CORS(app, 
+     origins=origins,  # 允许的域名列表
+     supports_credentials=True,  # 允许凭证
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],  # 允许的请求头
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 允许的HTTP方法
+     max_age=3600  # 预检请求结果缓存时间（秒）
+)
+
+# 添加CORS预检请求处理
+@app.after_request
+def after_request(response):
+    # 获取请求的Origin
+    origin = request.headers.get('Origin')
+    
+    # 如果Origin在允许列表中，设置CORS头部
+    if origin in origins or '*' in origins:
+        response.headers.add('Access-Control-Allow-Origin', origin)
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Max-Age', '3600')
+    
+    return response
 
 # 从环境变量获取Cognito配置
 COGNITO_REGION = os.environ.get('COGNITO_REGION', 'ap-southeast-2')
