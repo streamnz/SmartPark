@@ -1,9 +1,5 @@
 # SmartPark
 
-<p align="center">
-  <img src="path/to/logo.png" alt="SmartPark Logo" width="200"/>
-</p>
-
 ## 🚗 Overview
 
 SmartPark is an AI-powered intelligent parking management and simulation system that revolutionizes the urban parking experience. Built with a modern tech stack including React, Flask, and advanced 3D visualization, SmartPark helps users find, visualize, and navigate to optimal parking spots in complex parking structures.
@@ -150,9 +146,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📧 Contact
 
 Project Link: [https://github.com/yourusername/SmartPark](https://github.com/yourusername/SmartPark)
-
----
-
-<p align="center">
-  Made with ❤️ for smarter urban transportation
-</p>
