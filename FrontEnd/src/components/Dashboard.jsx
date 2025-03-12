@@ -52,8 +52,13 @@ import { api } from "../services/api";
 import routesService from "../services/routesService";
 import GoogleMap from "./GoogleMap"; // 导入新的GoogleMap组件
 import VideogameAssetIcon from "@mui/icons-material/VideogameAsset";
-import ParkingSimulator from "./ParkingSimulator";
+import ParkingSimulator, { Simulator3DButton } from "./ParkingSimulator";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import RecommendIcon from "@mui/icons-material/Recommend";
+import ParkingLotView from "./ParkingLotView"; // 添加新组件引用
+import ReceiptIcon from "@mui/icons-material/Receipt"; // 添加收据图标
+import ReservationHistory from "./ReservationHistory"; // 导入预约历史组件
+import SelectParkingLot from "./SelectParkingLot"; // 添加新的SelectParkingLot组件
 
 function Dashboard() {
   const { currentUser, accessToken, logout } = useAuth();
@@ -70,6 +75,7 @@ function Dashboard() {
   const [isParked, setIsParked] = useState(false);
   const navigationTimer = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [isUsingDefaultLocation, setIsUsingDefaultLocation] = useState(false);
   const [routeDetails, setRouteDetails] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -89,11 +95,23 @@ function Dashboard() {
   const animationTimerRef = useRef(null);
   const animationStartTimeRef = useRef(null);
   const animationDurationRef = useRef(5000); // 5秒动画时长
-  const [showSimulator, setShowSimulator] = useState(false);
   const [selectedLotId, setSelectedLotId] = useState(null);
   const [selectedLot, setSelectedLot] = useState(null);
   const [gameResults, setGameResults] = useState(null);
   const [showResults, setShowResults] = useState(false);
+  const [recommendedParkingId, setRecommendedParkingId] = useState(null);
+  const [recommendationReason, setRecommendationReason] = useState("");
+  const [loadingRecommendation, setLoadingRecommendation] = useState(false);
+  const [showParkingLotView, setShowParkingLotView] = useState(false);
+  const [selectedParkingLot, setSelectedParkingLot] = useState(null);
+  const [showReservationHistory, setShowReservationHistory] = useState(false); // 添加预约历史状态
+  const [userReservations, setUserReservations] = useState([]); // 添加用户预约记录状态
+  const [userInfo, setUserInfo] = useState(null); // 新增用户信息状态
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [view, setView] = useState("select_parking"); // 添加新的状态变量
+  const [isLoadingParkingLots, setIsLoadingParkingLots] = useState(false); // 添加新的状态变量
+  const [nearbyParkingLots, setNearbyParkingLots] = useState([]); // 添加新的状态变量
+  const [currentParkingLot, setCurrentParkingLot] = useState(null); // 添加新的状态变量
 
   useEffect(() => {
     async function loadInitialData() {
@@ -123,6 +141,20 @@ function Dashboard() {
 
     loadInitialData();
   }, [currentUser, accessToken]);
+
+  // 从sessionStorage获取用户信息
+  useEffect(() => {
+    try {
+      const storedUserInfo = sessionStorage.getItem("userInfo");
+      if (storedUserInfo) {
+        const parsedUserInfo = JSON.parse(storedUserInfo);
+        setUserInfo(parsedUserInfo);
+        console.log("User info loaded from session storage:", parsedUserInfo);
+      }
+    } catch (error) {
+      console.error("Error loading user info from session storage:", error);
+    }
+  }, []);
 
   const handleSelectDestination = (destination) => {
     setSelectedDestination(destination);
@@ -209,51 +241,119 @@ function Dashboard() {
   /**
    * 启用AI引导停车
    */
-  const enableAIParking = () => {
+  const enableAIParking = async () => {
     setShowArrivalDialog(false);
+    setLoadingRecommendation(true);
+
+    console.log("=== DeepSeek AI recommendation process started ===");
+    console.log("Current location:", userLocation);
+    console.log("Destination:", selectedDestination);
 
     // 模拟获取附近停车场数据
     if (selectedDestination) {
-      const mockNearbyParkings = [
-        {
-          id: "parking_1",
-          name: `${selectedDestination.name} Parking A`,
-          location: {
-            lat: selectedDestination.location.lat + 0.002,
-            lng: selectedDestination.location.lng + 0.003,
+      try {
+        // 生成停车场数据
+        const mockNearbyParkings = [
+          {
+            id: "parking_1",
+            name: `${selectedDestination.name} Parking A`,
+            location: {
+              lat: selectedDestination.location.lat + 0.002,
+              lng: selectedDestination.location.lng + 0.003,
+            },
+            distance_to_destination: Math.floor(Math.random() * 200) + 100,
+            available_spots: Math.floor(Math.random() * 30) + 5,
+            total_spots: Math.floor(Math.random() * 50) + 40,
+            hourly_rate: (Math.random() * 5 + 5).toFixed(2),
           },
-          distance_to_destination: Math.floor(Math.random() * 200) + 100,
-          available_spots: Math.floor(Math.random() * 30) + 5,
-          total_spots: Math.floor(Math.random() * 50) + 40,
-          hourly_rate: (Math.random() * 5 + 5).toFixed(2),
-        },
-        {
-          id: "parking_2",
-          name: `Downtown Parking`,
-          location: {
-            lat: selectedDestination.location.lat - 0.001,
-            lng: selectedDestination.location.lng + 0.001,
+          {
+            id: "parking_2",
+            name: `Downtown Parking`,
+            location: {
+              lat: selectedDestination.location.lat - 0.001,
+              lng: selectedDestination.location.lng + 0.001,
+            },
+            distance_to_destination: Math.floor(Math.random() * 200) + 150,
+            available_spots: Math.floor(Math.random() * 20) + 3,
+            total_spots: Math.floor(Math.random() * 40) + 30,
+            hourly_rate: (Math.random() * 4 + 3).toFixed(2),
           },
-          distance_to_destination: Math.floor(Math.random() * 200) + 150,
-          available_spots: Math.floor(Math.random() * 20) + 3,
-          total_spots: Math.floor(Math.random() * 40) + 30,
-          hourly_rate: (Math.random() * 4 + 3).toFixed(2),
-        },
-        {
-          id: "parking_3",
-          name: `Premium Parking`,
-          location: {
-            lat: selectedDestination.location.lat + 0.001,
-            lng: selectedDestination.location.lng - 0.002,
+          {
+            id: "parking_3",
+            name: `Premium Parking`,
+            location: {
+              lat: selectedDestination.location.lat + 0.001,
+              lng: selectedDestination.location.lng - 0.002,
+            },
+            distance_to_destination: Math.floor(Math.random() * 300) + 200,
+            available_spots: Math.floor(Math.random() * 15) + 2,
+            total_spots: Math.floor(Math.random() * 30) + 20,
+            hourly_rate: (Math.random() * 6 + 8).toFixed(2),
           },
-          distance_to_destination: Math.floor(Math.random() * 300) + 200,
-          available_spots: Math.floor(Math.random() * 15) + 2,
-          total_spots: Math.floor(Math.random() * 30) + 20,
-          hourly_rate: (Math.random() * 6 + 8).toFixed(2),
-        },
-      ];
+        ];
 
-      setNearbyParkings(mockNearbyParkings);
+        console.log("Generated nearby parking data:", mockNearbyParkings);
+        setNearbyParkings(mockNearbyParkings);
+
+        console.log(
+          "Calling DeepSeek AI algorithm for parking recommendations..."
+        );
+
+        // 将整个调用包装在try-catch中，确保错误不会导致UI卡死
+        try {
+          const recommendationData = await api.getParkingRecommendation(
+            selectedDestination.name,
+            mockNearbyParkings
+          );
+
+          console.log(
+            "DeepSeek AI recommendation results:",
+            recommendationData
+          );
+
+          // 更新推荐停车场ID和理由
+          setRecommendedParkingId(recommendationData.recommendedParkingId);
+          setRecommendationReason(recommendationData.reason);
+
+          console.log(
+            "AI recommended parking ID:",
+            recommendationData.recommendedParkingId
+          );
+          console.log("AI recommendation reason:", recommendationData.reason);
+        } catch (apiError) {
+          console.error(
+            "DeepSeek API call failed, using backup recommendation logic:",
+            apiError
+          );
+
+          // 直接在UI逻辑中实现简单的备用推荐算法
+          // 默认选择可用车位最多的停车场
+          const backup = mockNearbyParkings.reduce(
+            (best, current) =>
+              current.available_spots > best.available_spots ? current : best,
+            mockNearbyParkings[0]
+          );
+
+          setRecommendedParkingId(backup.id);
+          setRecommendationReason(
+            "Based on availability analysis, this parking lot is recommended. (API call failed, using backup recommendation)"
+          );
+
+          console.log("Backup recommendation generated:", backup.id);
+        }
+      } catch (error) {
+        console.error("Parking recommendation process error:", error);
+        // 处理错误，设置默认推荐
+        setRecommendedParkingId("parking_1");
+        setRecommendationReason(
+          "System recommendation - Closest with enough available spots"
+        );
+
+        console.error("Using default recommendation:", "parking_1");
+      } finally {
+        console.log("=== DeepSeek AI recommendation process completed ===");
+        setLoadingRecommendation(false);
+      }
     }
 
     setNavigationProgress("arrived");
@@ -268,36 +368,132 @@ function Dashboard() {
   };
 
   const handleArriveParking = (parkingLot) => {
+    console.log("选择停车场:", parkingLot);
+    setCurrentParkingLot(parkingLot);
+    setSelectedParkingLot(parkingLot); // 同时设置selectedParkingLot以保持状态一致
+    setView("parking_lot");
+  };
+
+  // 处理预约保存
+  const handleSaveReservation = async (reservationData) => {
+    try {
+      // 从sessionStorage中获取用户ID
+      let userId = "guest";
+
+      // 尝试从userInfo获取用户ID
+      if (userInfo && userInfo.sub) {
+        userId = userInfo.sub; // Cognito通常使用sub作为用户唯一标识
+      } else if (userInfo && userInfo.email) {
+        userId = userInfo.email; // 备用：使用邮箱作为ID
+      } else if (currentUser && currentUser.id) {
+        userId = currentUser.id; // 兼容原有逻辑
+      }
+
+      // 添加用户ID和其他必要信息
+      const fullReservationData = {
+        user_id: userId,
+        ...reservationData,
+        destination_name: selectedDestination?.name || "Unknown Destination",
+        status: "active",
+      };
+
+      console.log("Saving reservation with user info:", fullReservationData);
+      const result = await api.saveReservation(fullReservationData);
+
+      if (result && result.status === "success") {
+        console.log("Reservation saved successfully:", result);
+      } else {
+        console.error("Failed to save reservation:", result);
+      }
+    } catch (error) {
+      console.error("Error saving reservation:", error);
+    }
+  };
+
+  const handleParkingComplete = (selectedSpot) => {
     setActiveStep(3);
-    api
-      .getParkingLotDetails(parkingLot.id)
-      .then((details) => {
-        setParkingLotDetails(details);
-        setActiveParkingLot(parkingLot);
-      })
-      .catch((err) => {
-        console.error("Error fetching parking lot details:", err);
-        setParkingLotDetails({
-          recommended_spot: {
-            id: "A12",
-            type: "standard",
-          },
-          spots: {
-            A12: {
-              id: "A12",
-              row: 0,
-              col: 11,
-              type: "standard",
-              is_occupied: false,
-            },
-          },
-        });
-      });
+    // 创建一个假的停车位数据，包含所选停车位信息
+    const parkingDetails = {
+      recommended_spot: {
+        id: selectedSpot.spot.id,
+        type: selectedSpot.spot.type,
+      },
+      spots: {
+        [selectedSpot.spot.id]: {
+          id: selectedSpot.spot.id,
+          row: selectedSpot.spot.row,
+          col: selectedSpot.spot.col,
+          type: selectedSpot.spot.type,
+          is_occupied: false,
+        },
+      },
+    };
+
+    setParkingLotDetails(parkingDetails);
+    setActiveParkingLot(selectedParkingLot);
+    setNavigationProgress("parking");
+
+    // 如果有parkingInfo，保存预约记录
+    if (selectedSpot && selectedSpot.parkingInfo) {
+      const reservationData = {
+        parking_lot_id: selectedParkingLot.id,
+        parking_lot_name: selectedParkingLot.name,
+        spot_id: selectedSpot.spot.id,
+        spot_type: selectedSpot.spot.type,
+        hourly_rate: selectedSpot.parkingInfo.hourlyRate,
+        reservation_time: selectedSpot.parkingInfo.startTime,
+        expiration_time: selectedSpot.parkingInfo.expirationTime,
+      };
+
+      handleSaveReservation(reservationData);
+    }
   };
 
   const completeParking = () => {
+    // 显示停车完成消息
     setIsParked(true);
     setActiveStep(4);
+
+    // 等待一段时间后完全重置应用状态
+    setTimeout(() => {
+      // 重置所有导航状态
+      setActiveStep(0);
+      setSelectedDestination(null);
+      setParkingLotDetails(null);
+      setActiveParkingLot(null);
+      setNavigationProgress("idle");
+      setIsParked(false);
+
+      // 确保关闭所有弹窗和对话框
+      setShowParkingLotView(false);
+      setSelectedParkingLot(null);
+      setShowArrivalDialog(false);
+      setShowSimulator(false);
+
+      // 清除所有通知状态
+      if (window.successSnackbarTimeout) {
+        clearTimeout(window.successSnackbarTimeout);
+      }
+
+      // 清除路线信息
+      setRouteDetails(null);
+
+      // 重置模拟器状态
+      setGameResults(null);
+      setShowResults(false);
+
+      // 刷新用户位置
+      getCurrentLocation();
+
+      // 清除任何可能存在的计时器
+      if (animationTimerRef.current) {
+        clearInterval(animationTimerRef.current);
+        animationTimerRef.current = null;
+      }
+
+      // 可能需要重新加载初始数据
+      loadInitialData();
+    }, 1000); // 给用户1秒钟时间看到完成消息，从3秒改为1秒
   };
 
   const resetNavigation = () => {
@@ -321,25 +517,33 @@ function Dashboard() {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
-          console.log("获取到用户位置:", currentLocation);
+          console.log("Got user's position:", currentLocation);
           setUserLocation(currentLocation);
+          setIsUsingDefaultLocation(false);
           setLoadingLocation(false);
 
-          // 如果用户已选择目的地，立即计算路线
+          // If user has already selected a destination, calculate route immediately
           if (selectedDestination && selectedDestination.location) {
-            console.log("用户位置更新，重新计算路线");
+            console.log("User position updated, recalculating route");
             calculateRoute(currentLocation, selectedDestination.location);
           }
         },
         (error) => {
           console.error("Error getting current location:", error);
-          setMapError(
-            "Unable to get your current location. Please enable location services."
-          );
-          setLoadingLocation(false);
 
-          const defaultLocation = { lat: -36.8508, lng: 174.7645 };
+          // Use 51A Rosedale Road, Auckland as default location
+          const defaultLocation = { lat: -36.7456, lng: 174.7361 };
+          console.log(
+            "Location access denied. Using default location: 51A Rosedale Road",
+            defaultLocation
+          );
+
+          setMapError(
+            "Using 51A Rosedale Road, Auckland as starting point. To use your current location, please enable location services."
+          );
           setUserLocation(defaultLocation);
+          setIsUsingDefaultLocation(true);
+          setLoadingLocation(false);
 
           if (selectedDestination && selectedDestination.location) {
             calculateRoute(defaultLocation, selectedDestination.location);
@@ -350,10 +554,17 @@ function Dashboard() {
     } else {
       setMapError("Geolocation is not supported by this browser.");
 
-      const defaultLocation = { lat: -36.8508, lng: 174.7645 };
-      setUserLocation(defaultLocation);
+      // Use 51A Rosedale Road, Auckland as default location
+      const defaultLocation = { lat: -36.7456, lng: 174.7361 };
+      console.log(
+        "Geolocation not supported. Using default location: 51A Rosedale Road",
+        defaultLocation
+      );
 
-      // 如果有目的地，也计算路线
+      setUserLocation(defaultLocation);
+      setIsUsingDefaultLocation(true);
+
+      // If there's a destination, calculate route
       if (selectedDestination && selectedDestination.location) {
         calculateRoute(defaultLocation, selectedDestination.location);
       }
@@ -504,7 +715,9 @@ function Dashboard() {
   const initializeMap = () => {
     if (!mapRef.current || !window.google || !window.google.maps) return;
 
-    const mapCenter = userLocation || { lat: -36.8508, lng: 174.7645 };
+    // Get center location, use default if user location not available
+    const defaultLocation = { lat: -36.7456, lng: 174.7361 }; // 51A Rosedale Road
+    const mapCenter = userLocation || defaultLocation;
 
     googleMapsRef.current = new window.google.maps.Map(mapRef.current, {
       zoom: 13,
@@ -551,6 +764,18 @@ function Dashboard() {
         },
       ],
     });
+
+    // Add a marker for the default location if using it
+    if (isUsingDefaultLocation && googleMapsRef.current) {
+      new window.google.maps.Marker({
+        position: defaultLocation,
+        map: googleMapsRef.current,
+        title: "51A Rosedale Road (Starting Point)",
+        icon: {
+          url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+        },
+      });
+    }
 
     if (userLocation && selectedDestination && selectedDestination.location) {
       calculateRoute(userLocation, selectedDestination.location);
@@ -721,26 +946,30 @@ function Dashboard() {
 
   // 处理打开模拟器
   const handleOpenSimulator = (lot) => {
-    setSelectedLotId(lot.id);
-    setSelectedLot(lot);
+    console.log("Opening simulator for lot:", lot);
+    setSelectedParkingLot(lot);
     setShowSimulator(true);
   };
 
   // 处理关闭模拟器
-  const handleCloseSimulator = (results) => {
+  const handleCloseSimulator = () => {
     setShowSimulator(false);
-
-    // 如果有游戏结果，显示结果对话框
-    if (results && !results.closed) {
-      setGameResults(results);
-      setShowResults(true);
-    }
   };
 
   // 处理游戏结果对话框关闭
   const handleCloseResults = () => {
     setShowResults(false);
     setGameResults(null);
+  };
+
+  // 打开预约历史对话框
+  const handleOpenReservationHistory = () => {
+    setShowReservationHistory(true);
+  };
+
+  // 关闭预约历史对话框
+  const handleCloseReservationHistory = () => {
+    setShowReservationHistory(false);
   };
 
   if (loading) {
@@ -861,8 +1090,21 @@ function Dashboard() {
             color="inherit"
             sx={{ mr: 1, display: { xs: "none", sm: "block" } }}
           >
-            {currentUser?.email || "User"}
+            {userInfo?.email || currentUser?.email || "User"}
           </Typography>
+
+          {/* 添加预约历史按钮 */}
+          <Tooltip title="Parking Reservation History">
+            <IconButton
+              color="inherit"
+              onClick={handleOpenReservationHistory}
+              size="small"
+              sx={{ mr: 1 }}
+            >
+              <ReceiptIcon />
+            </IconButton>
+          </Tooltip>
+
           <IconButton color="inherit" onClick={logout} size="small">
             <LogoutIcon />
           </IconButton>
@@ -1004,7 +1246,13 @@ function Dashboard() {
                 variant="caption"
                 sx={{ ml: 3, display: "block", color: "rgba(255,255,255,0.7)" }}
               >
-                {userLocation?.lat?.toFixed(4)}, {userLocation?.lng?.toFixed(4)}
+                {isUsingDefaultLocation
+                  ? "51A Rosedale Road, Auckland (Default)"
+                  : userLocation
+                  ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(
+                      4
+                    )}`
+                  : "Detecting location..."}
               </Typography>
             </Box>
 
@@ -1136,100 +1384,312 @@ function Dashboard() {
                 }}
               >
                 <Typography
-                  variant="body2"
+                  variant="h6"
                   gutterBottom
-                  sx={{ fontWeight: 500 }}
+                  sx={{
+                    fontWeight: 500,
+                    mb: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    color: "#8AB4F8",
+                  }}
                 >
-                  Nearby Parking Lots
+                  <LocalParkingIcon sx={{ mr: 1 }} />
+                  Select Parking Lot
                 </Typography>
-                <Grid container spacing={1}>
-                  {nearbyParkings.map((parking) => (
-                    <Grid item xs={12} key={parking.id}>
-                      <Card
-                        sx={{
-                          display: "flex",
-                          mb: 1,
-                          backgroundColor: "rgba(48,49,52,0.85)",
-                          borderRadius: 1,
-                        }}
-                      >
-                        <CardContent sx={{ flex: 1, p: 1.5 }}>
-                          <Typography
-                            variant="body2"
-                            sx={{ fontWeight: 500, mb: 0.5 }}
-                          >
-                            {parking.name}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              display: "block",
-                              color: "rgba(255,255,255,0.6)",
-                            }}
-                          >
-                            Distance to destination:{" "}
-                            {parking.distance_to_destination || "Unknown"} m
-                          </Typography>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              mt: 0.5,
-                            }}
-                          >
-                            <Tooltip title="Available Spots">
-                              <Box
+
+                {loadingRecommendation && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      my: 3,
+                      p: 3,
+                      borderRadius: 2,
+                      backgroundColor: "rgba(25, 118, 210, 0.05)",
+                    }}
+                  >
+                    <CircularProgress size={28} color="primary" />
+                    <Typography variant="body2" sx={{ ml: 2, fontWeight: 500 }}>
+                      AI is analyzing the best parking options...
+                    </Typography>
+                  </Box>
+                )}
+
+                <Grid container spacing={1.5}>
+                  {nearbyParkings.map((parking) => {
+                    const isRecommended = parking.id === recommendedParkingId;
+                    const occupancyRate =
+                      (parking.available_spots / parking.total_spots) * 100;
+                    const occupancyColor =
+                      occupancyRate > 30
+                        ? "#4caf50"
+                        : occupancyRate > 15
+                        ? "#ff9800"
+                        : "#f44336";
+
+                    return (
+                      <Grid item xs={12} key={parking.id}>
+                        <Card
+                          sx={{
+                            display: "flex",
+                            mb: 0.5,
+                            backgroundColor: isRecommended
+                              ? "rgba(25, 118, 210, 0.15)"
+                              : "rgba(48,49,52,0.85)",
+                            borderRadius: 2,
+                            borderLeft: isRecommended
+                              ? "4px solid #1A73E8"
+                              : "none",
+                            boxShadow: isRecommended
+                              ? "0 4px 12px rgba(26, 115, 232, 0.2)"
+                              : "none",
+                            transition: "all 0.2s ease-in-out",
+                            "&:hover": {
+                              transform: "translateY(-2px)",
+                              boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
+                            },
+                            overflow: "hidden",
+                            position: "relative",
+                          }}
+                        >
+                          {isRecommended && (
+                            <Box
+                              sx={{
+                                position: "absolute",
+                                top: 0,
+                                right: 0,
+                                backgroundColor: "#1A73E8",
+                                px: 1.5,
+                                py: 0.5,
+                                borderBottomLeftRadius: 8,
+                                zIndex: 1,
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontWeight: "bold",
+                                  color: "white",
+                                  display: "flex",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <RecommendIcon
+                                  fontSize="small"
+                                  sx={{ mr: 0.5, fontSize: "0.875rem" }}
+                                />
+                                AI PICK
+                              </Typography>
+                            </Box>
+                          )}
+
+                          <Box sx={{ flex: 1, p: 1.8 }}>
+                            <Typography
+                              variant="body1"
+                              sx={{ fontWeight: 600, mb: 0.5 }}
+                            >
+                              {parking.name}
+                            </Typography>
+
+                            {isRecommended && recommendationReason && (
+                              <Typography
+                                variant="body2"
                                 sx={{
                                   display: "flex",
                                   alignItems: "center",
-                                  mr: 2,
+                                  color: "#90caf9",
+                                  fontStyle: "italic",
+                                  mb: 1,
+                                  bgcolor: "rgba(25, 118, 210, 0.1)",
+                                  p: 1,
+                                  borderRadius: 1,
                                 }}
                               >
-                                <LocalParkingIcon
+                                <RecommendIcon
                                   fontSize="small"
-                                  sx={{ mr: 0.5, fontSize: "0.875rem" }}
+                                  sx={{ mr: 1 }}
                                 />
-                                <Typography variant="caption">
-                                  {parking.available_spots}/
-                                  {parking.total_spots}
-                                </Typography>
-                              </Box>
-                            </Tooltip>
-                            <Tooltip title="Hourly Rate">
+                                {recommendationReason}
+                              </Typography>
+                            )}
+
+                            <Box sx={{ display: "flex", mb: 1.5 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  color: "rgba(255,255,255,0.7)",
+                                }}
+                              >
+                                <LocationOnIcon
+                                  sx={{
+                                    fontSize: "0.9rem",
+                                    mr: 0.5,
+                                    color: "#ff5252",
+                                  }}
+                                />
+                                {parking.distance_to_destination || "Unknown"}{" "}
+                                meters away
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                mt: 1.5,
+                              }}
+                            >
                               <Box
                                 sx={{ display: "flex", alignItems: "center" }}
                               >
-                                <PaidIcon
-                                  fontSize="small"
-                                  sx={{ mr: 0.5, fontSize: "0.875rem" }}
-                                />
-                                <Typography variant="caption">
-                                  ${parking.hourly_rate}/hr
-                                </Typography>
+                                <Box sx={{ mr: 3 }}>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: "rgba(255,255,255,0.6)",
+                                      display: "block",
+                                      mb: 0.5,
+                                    }}
+                                  >
+                                    Availability
+                                  </Typography>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontWeight: "bold",
+                                        color: occupancyColor,
+                                      }}
+                                    >
+                                      {parking.available_spots}/
+                                      {parking.total_spots}
+                                    </Typography>
+                                    <Box
+                                      sx={{
+                                        width: 60,
+                                        ml: 1,
+                                        borderRadius: 5,
+                                        height: 4,
+                                        backgroundColor:
+                                          "rgba(255,255,255,0.1)",
+                                        overflow: "hidden",
+                                      }}
+                                    >
+                                      <Box
+                                        sx={{
+                                          width: `${occupancyRate}%`,
+                                          height: "100%",
+                                          backgroundColor: occupancyColor,
+                                          borderRadius: 5,
+                                        }}
+                                      />
+                                    </Box>
+                                  </Box>
+                                </Box>
+
+                                <Box>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: "rgba(255,255,255,0.6)",
+                                      display: "block",
+                                      mb: 0.5,
+                                    }}
+                                  >
+                                    Rate
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: "bold",
+                                      color: "#ffb74d",
+                                    }}
+                                  >
+                                    ${parking.hourly_rate}/hr
+                                  </Typography>
+                                </Box>
                               </Box>
-                            </Tooltip>
+
+                              <Box>
+                                {isRecommended ? (
+                                  <>
+                                    <Button
+                                      variant="contained"
+                                      color="secondary"
+                                      onClick={() =>
+                                        handleOpenSimulator(parking)
+                                      }
+                                      startIcon={<VideogameAssetIcon />}
+                                      sx={{
+                                        borderRadius: 2,
+                                        boxShadow:
+                                          "0 4px 10px rgba(156, 39, 176, 0.3)",
+                                        px: 2,
+                                        mr: 1,
+                                      }}
+                                    >
+                                      3D Simulator
+                                    </Button>
+                                    {/* //我要在这加点空间，让两个按钮不连在一起 */}
+                                    <Box
+                                      sx={{ width: "10px", height: "5px" }}
+                                    />
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={() =>
+                                        handleArriveParking(parking)
+                                      }
+                                      sx={{
+                                        color: "white",
+                                        borderColor: "rgba(255,255,255,0.3)",
+                                        borderRadius: 2,
+                                        "&:hover": {
+                                          borderColor: "#fff",
+                                          backgroundColor:
+                                            "rgba(255,255,255,0.05)",
+                                        },
+                                      }}
+                                    >
+                                      Select
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => handleArriveParking(parking)}
+                                    sx={{
+                                      color: "white",
+                                      borderColor: "rgba(255,255,255,0.3)",
+                                      borderRadius: 2,
+                                      "&:hover": {
+                                        borderColor: "#fff",
+                                        backgroundColor:
+                                          "rgba(255,255,255,0.05)",
+                                      },
+                                    }}
+                                  >
+                                    Select
+                                  </Button>
+                                )}
+                              </Box>
+                            </Box>
                           </Box>
-                        </CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            p: 1,
-                          }}
-                        >
-                          <Button
-                            variant="contained"
-                            color="secondary"
-                            onClick={() => handleOpenSimulator(parking)}
-                            className="select-btn"
-                            startIcon={<VideogameAssetIcon />}
-                          >
-                            3D Simulator
-                          </Button>
-                        </Box>
-                      </Card>
-                    </Grid>
-                  ))}
+                        </Card>
+                      </Grid>
+                    );
+                  })}
                 </Grid>
               </Box>
             )}
@@ -1245,23 +1705,149 @@ function Dashboard() {
                 }}
               >
                 <Typography
-                  variant="body2"
+                  variant="h6"
                   gutterBottom
-                  sx={{ fontWeight: 500 }}
-                >
-                  Smart Parking Assistant
-                </Typography>
-                <Typography
-                  variant="caption"
                   sx={{
-                    display: "block",
-                    color: "rgba(255,255,255,0.7)",
-                    mb: 1,
+                    fontWeight: 500,
+                    mb: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    color: "#4caf50",
                   }}
                 >
-                  AI has selected the best spot for you:
-                  {parkingLotDetails?.recommended_spot?.id || ""}
+                  <CheckCircleIcon sx={{ mr: 1 }} />
+                  Parking Spot Reserved
                 </Typography>
+
+                <Paper
+                  elevation={3}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: "rgba(76, 175, 80, 0.1)",
+                    border: "1px solid rgba(76, 175, 80, 0.3)",
+                    mb: 2,
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
+                    <LocalParkingIcon sx={{ color: "#4caf50", mr: 1 }} />
+                    <Typography variant="body1" sx={{ fontWeight: "bold" }}>
+                      {activeParkingLot?.name || "Parking Lot"}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      mb: 2,
+                    }}
+                  >
+                    <DirectionsCarIcon
+                      sx={{
+                        color: "primary.main",
+                        mr: 1.5,
+                        fontSize: "2.5rem",
+                        mt: 1,
+                      }}
+                    />
+                    <Box>
+                      <Typography
+                        variant="h4"
+                        color="primary.light"
+                        sx={{ mb: 0.5 }}
+                      >
+                        {parkingLotDetails?.recommended_spot?.id || "A1"}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "rgba(255,255,255,0.7)" }}
+                      >
+                        {parkingLotDetails?.recommended_spot?.type ===
+                          "disabled" && "Accessible parking spot"}
+                        {parkingLotDetails?.recommended_spot?.type ===
+                          "ev_charging" && "EV charging spot"}
+                        {parkingLotDetails?.recommended_spot?.type ===
+                          "standard" && "Standard parking spot"}
+                        {!parkingLotDetails?.recommended_spot?.type &&
+                          "Standard parking spot"}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: "block",
+                          mt: 1,
+                          color: "rgba(255,255,255,0.5)",
+                        }}
+                      >
+                        Level 1 - Section A
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      borderTop: "1px dashed rgba(255,255,255,0.1)",
+                      pt: 2,
+                    }}
+                  >
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "rgba(255,255,255,0.5)" }}
+                      >
+                        Parking Fee
+                      </Typography>
+                      <Typography
+                        variant="body1"
+                        sx={{ fontWeight: "bold", color: "#ffb74d" }}
+                      >
+                        ${activeParkingLot?.hourly_rate || "5.50"}/hr
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "rgba(255,255,255,0.5)" }}
+                      >
+                        Time Limit
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: "bold" }}>
+                        3 hrs
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "rgba(255,255,255,0.5)" }}
+                      >
+                        Expires At
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: "bold" }}>
+                        {new Date(
+                          Date.now() + 3 * 60 * 60 * 1000
+                        ).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Paper>
+
+                <Typography
+                  variant="body2"
+                  sx={{ mb: 2, color: "rgba(255,255,255,0.7)" }}
+                >
+                  Your parking spot has been successfully reserved. Navigate to
+                  the spot and park your vehicle.
+                </Typography>
+
                 <Button
                   variant="contained"
                   color="success"
@@ -1270,10 +1856,10 @@ function Dashboard() {
                   sx={{
                     mt: 1,
                     mb: 1,
-                    py: 1,
-                    backgroundColor: "#34A853",
+                    py: 1.5,
+                    backgroundColor: "#4caf50",
                     "&:hover": {
-                      backgroundColor: "#2E8B57",
+                      backgroundColor: "#388e3c",
                     },
                   }}
                 >
@@ -1286,45 +1872,167 @@ function Dashboard() {
             {navigationProgress === "completed" && (
               <Box sx={{ textAlign: "center" }}>
                 <Typography
-                  variant="body1"
+                  variant="h5"
                   gutterBottom
-                  sx={{ fontWeight: 500 }}
-                >
-                  Parking Successful!
-                </Typography>
-                <Typography
-                  variant="caption"
                   sx={{
-                    display: "block",
-                    mb: 1,
-                    color: "rgba(255,255,255,0.7)",
+                    fontWeight: 500,
+                    color: "#4caf50",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  Your vehicle has been parked successfully
+                  <CheckCircleIcon sx={{ mr: 1 }} />
+                  Parking Complete
                 </Typography>
-                <Typography
-                  variant="body2"
-                  color="#34A853"
-                  paragraph
-                  sx={{ fontWeight: 500 }}
-                >
-                  Your parking spot:
-                  {parkingLotDetails?.recommended_spot?.id || ""}
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={resetNavigation}
+
+                <Paper
+                  elevation={3}
                   sx={{
-                    mt: 1,
-                    backgroundColor: "#1A73E8",
-                    "&:hover": {
-                      backgroundColor: "#1765CC",
-                    },
+                    p: 3,
+                    borderRadius: 2,
+                    bgcolor: "rgba(76, 175, 80, 0.1)",
+                    border: "1px solid rgba(76, 175, 80, 0.3)",
+                    mb: 3,
+                    mt: 2,
                   }}
                 >
-                  Start New Trip
-                </Button>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        bgcolor: "rgba(76, 175, 80, 0.2)",
+                        borderRadius: "50%",
+                        width: 80,
+                        height: 80,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <DirectionsCarIcon
+                        sx={{ fontSize: 40, color: "#4caf50" }}
+                      />
+                    </Box>
+
+                    <Typography
+                      variant="h4"
+                      color="primary.light"
+                      sx={{ mb: 0.5 }}
+                    >
+                      {parkingLotDetails?.recommended_spot?.id || "A1"}
+                    </Typography>
+
+                    <Typography variant="body1" sx={{ mb: 0.5 }}>
+                      {activeParkingLot?.name || "Parking Lot"}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(255,255,255,0.7)", mb: 2 }}
+                    >
+                      Your vehicle has been successfully parked
+                    </Typography>
+
+                    <Box
+                      sx={{
+                        width: "100%",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        p: 2,
+                        borderRadius: 1,
+                        bgcolor: "rgba(0,0,0,0.2)",
+                      }}
+                    >
+                      <Box sx={{ textAlign: "left" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "rgba(255,255,255,0.5)" }}
+                        >
+                          Parking Started
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                          {new Date().toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ textAlign: "center" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "rgba(255,255,255,0.5)" }}
+                        >
+                          Rate
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: "bold", color: "#ffb74d" }}
+                        >
+                          ${activeParkingLot?.hourly_rate || "5.50"}/hr
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ textAlign: "right" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "rgba(255,255,255,0.5)" }}
+                        >
+                          Expires At
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                          {new Date(
+                            Date.now() + 3 * 60 * 60 * 1000
+                          ).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                </Paper>
+
+                <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={resetNavigation}
+                    sx={{
+                      flex: 1,
+                      py: 1.5,
+                      backgroundColor: "#1A73E8",
+                      "&:hover": {
+                        backgroundColor: "#1765CC",
+                      },
+                    }}
+                  >
+                    Start New Trip
+                  </Button>
+
+                  <Button
+                    variant="outlined"
+                    sx={{
+                      flex: 1,
+                      py: 1.5,
+                      color: "white",
+                      borderColor: "rgba(255,255,255,0.3)",
+                      "&:hover": {
+                        borderColor: "white",
+                        backgroundColor: "rgba(255,255,255,0.05)",
+                      },
+                    }}
+                  >
+                    View Ticket
+                  </Button>
+                </Box>
               </Box>
             )}
           </CardContent>
@@ -1373,7 +2081,7 @@ function Dashboard() {
             parkingLot={parkingLotDetails}
             vehiclePosition={vehiclePosition}
             recommendedSpot={parkingLotDetails.recommended_spot}
-            onCompleteParking={completeParking}
+            onCompleteParking={handleParkingComplete}
           />
         </Box>
       )}
@@ -1503,8 +2211,21 @@ function Dashboard() {
           </Typography>
 
           <Typography variant="body1" paragraph>
-            You have arrived at {selectedDestination?.name}. Would you like to
-            use AI-guided parking assistance?
+            You have arrived at {selectedDestination?.name}.
+            {isUsingDefaultLocation && (
+              <Typography
+                variant="body2"
+                color="warning.light"
+                sx={{ mt: 1, fontStyle: "italic" }}
+              >
+                Note: Navigation started from 51A Rosedale Road (default
+                location)
+              </Typography>
+            )}
+          </Typography>
+
+          <Typography variant="body1" paragraph>
+            Would you like to use AI-guided parking assistance?
           </Typography>
 
           <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
@@ -1622,8 +2343,7 @@ function Dashboard() {
       <ParkingSimulator
         open={showSimulator}
         onClose={handleCloseSimulator}
-        parkingLotId={selectedLotId}
-        difficulty="medium"
+        parkingLotId={selectedParkingLot?.id}
       />
 
       {/* 游戏结果对话框 */}
@@ -1686,6 +2406,32 @@ function Dashboard() {
           )}
         </DialogActions>
       </Dialog>
+
+      {/* 添加预约历史对话框 */}
+      <ReservationHistory
+        open={showReservationHistory}
+        onClose={handleCloseReservationHistory}
+      />
+
+      {/* 选择停车场列表 */}
+      {view === "select_parking" && (
+        <SelectParkingLot
+          parkingLots={nearbyParkingLots}
+          onSelectParkingLot={handleArriveParking}
+          isLoading={isLoadingParkingLots}
+        />
+      )}
+
+      {/* 添加停车场详情和预约界面 */}
+      {view === "parking_lot" && currentParkingLot && (
+        <ParkingLotView
+          open={true}
+          onClose={() => setView("select_parking")}
+          onParkingComplete={handleParkingComplete}
+          lot={currentParkingLot}
+          onSaveReservation={handleSaveReservation}
+        />
+      )}
     </Box>
   );
 }

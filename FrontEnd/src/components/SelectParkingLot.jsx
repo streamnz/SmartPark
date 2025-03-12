@@ -12,53 +12,34 @@ import {
   Rating,
   Skeleton,
   Tooltip,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogActions,
 } from "@mui/material";
 import LocalParkingIcon from "@mui/icons-material/LocalParking";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import VideogameAssetIcon from "@mui/icons-material/VideogameAsset";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
-import ParkingSimulator from "./ParkingSimulator"; // 导入我们创建的模拟器组件
+import ParkingSimulator, {
+  Simulator3DButton,
+  SelectButton,
+} from "./ParkingSimulator"; // 导入我们创建的模拟器组件和按钮组件
 
 function SelectParkingLot({ parkingLots, onSelectParkingLot, isLoading }) {
   const [showSimulator, setShowSimulator] = useState(false);
   const [selectedLotId, setSelectedLotId] = useState(null);
-  const [selectedLot, setSelectedLot] = useState(null);
-  const [gameResults, setGameResults] = useState(null);
-  const [showResults, setShowResults] = useState(false);
 
   // 处理打开模拟器
   const handleOpenSimulator = (lot) => {
     setSelectedLotId(lot.id);
-    setSelectedLot(lot);
     setShowSimulator(true);
   };
 
-  // 处理关闭模拟器
-  const handleCloseSimulator = (results) => {
+  // 处理关闭模拟器 - 简化逻辑，不再显示结果弹窗
+  const handleCloseSimulator = () => {
     setShowSimulator(false);
-
-    // 如果有游戏结果，显示结果对话框
-    if (results && !results.closed) {
-      setGameResults(results);
-      setShowResults(true);
-    }
   };
 
   // 处理选择停车场
   const handleSelectParkingLot = (lot) => {
     // 调用父组件的回调
     onSelectParkingLot(lot);
-  };
-
-  // 处理游戏结果对话框关闭
-  const handleCloseResults = () => {
-    setShowResults(false);
-    setGameResults(null);
   };
 
   // 渲染停车场卡片
@@ -100,8 +81,24 @@ function SelectParkingLot({ parkingLots, onSelectParkingLot, isLoading }) {
               transform: "translateY(-4px)",
               boxShadow: 6,
             },
+            position: "relative",
           }}
         >
+          {lot.isAIPick && (
+            <Chip
+              label="AI PICK"
+              color="primary"
+              size="small"
+              sx={{
+                position: "absolute",
+                top: 10,
+                left: 10,
+                fontWeight: "bold",
+                backgroundColor: "#2196f3",
+                zIndex: 1,
+              }}
+            />
+          )}
           <CardMedia
             component="img"
             height="140"
@@ -112,7 +109,7 @@ function SelectParkingLot({ parkingLots, onSelectParkingLot, isLoading }) {
             alt={lot.name}
           />
           <CardContent sx={{ flexGrow: 1 }}>
-            <Typography gutterBottom variant="h5" component="div">
+            <Typography variant="h5" component="div" gutterBottom>
               {lot.name}
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -162,24 +159,21 @@ function SelectParkingLot({ parkingLots, onSelectParkingLot, isLoading }) {
               />
             </Box>
           </CardContent>
-          <CardActions sx={{ justifyContent: "space-between", px: 2, pb: 2 }}>
-            <Button
-              size="small"
-              variant="contained"
-              color="secondary"
-              startIcon={<VideogameAssetIcon />}
-              onClick={() => handleOpenSimulator(lot)}
+          <CardActions sx={{ justifyContent: "flex-end", px: 2, pb: 2 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+                justifyContent: "flex-end",
+                gap: 1.5,
+              }}
             >
-              3D Simulator
-            </Button>
-
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => handleSelectParkingLot(lot)}
-            >
-              Navigate
-            </Button>
+              {lot.isAIPick && (
+                <Simulator3DButton onClick={() => handleOpenSimulator(lot)} />
+              )}
+              <SelectButton onClick={() => handleSelectParkingLot(lot)} />
+            </Box>
           </CardActions>
         </Card>
       </Grid>
@@ -196,72 +190,12 @@ function SelectParkingLot({ parkingLots, onSelectParkingLot, isLoading }) {
         {renderParkingLotCards()}
       </Grid>
 
-      {/* 停车模拟游戏 */}
+      {/* 停车模拟器 - 简化为仅显示3D模型 */}
       <ParkingSimulator
         open={showSimulator}
         onClose={handleCloseSimulator}
         parkingLotId={selectedLotId}
-        difficulty="medium"
       />
-
-      {/* 游戏结果对话框 */}
-      <Dialog open={showResults} onClose={handleCloseResults}>
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <EmojiEventsIcon color="warning" />
-          Parking Simulation Results
-        </DialogTitle>
-        <DialogContent>
-          {gameResults && (
-            <Box sx={{ py: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Great job!
-              </Typography>
-              <Typography variant="body1" paragraph>
-                You successfully parked in spot {gameResults.spot?.id}.
-              </Typography>
-
-              <Box
-                sx={{ display: "flex", justifyContent: "space-between", my: 2 }}
-              >
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Time
-                  </Typography>
-                  <Typography variant="h6">
-                    {Math.floor(gameResults.timeElapsed / 60)}:
-                    {(gameResults.timeElapsed % 60).toString().padStart(2, "0")}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Score
-                  </Typography>
-                  <Typography variant="h6">{gameResults.score}</Typography>
-                </Box>
-              </Box>
-
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                Would you like to navigate to this parking lot?
-              </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseResults}>Close</Button>
-          {selectedLot && (
-            <Button
-              variant="contained"
-              onClick={() => {
-                handleCloseResults();
-                handleSelectParkingLot(selectedLot);
-              }}
-            >
-              Navigate to This Parking
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
