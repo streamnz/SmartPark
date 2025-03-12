@@ -28,30 +28,36 @@ ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5173,https
 origins = ALLOWED_ORIGINS.split(',')
 logger.info(f"Configuring CORS with allowed origins: {origins}")
 
-# 应用CORS到整个应用，而不仅仅是/api/*路由
+# ============================================
+# 修改CORS配置，避免重复头部问题 
+# ============================================
+
+# 方法1：只使用flask_cors的CORS中间件，不再手动设置头部
 CORS(app, 
-     origins=origins,  # 允许的域名列表
-     supports_credentials=True,  # 允许凭证
-     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],  # 允许的请求头
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 允许的HTTP方法
-     max_age=3600  # 预检请求结果缓存时间（秒）
+     origins=origins,
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     max_age=3600
 )
 
-# 添加CORS预检请求处理
-@app.after_request
-def after_request(response):
-    # 获取请求的Origin
-    origin = request.headers.get('Origin')
+# ============================================
+# 注释掉手动设置CORS头部的代码，避免重复设置
+# ============================================
+# @app.after_request
+# def after_request(response):
+#     # 获取请求的Origin
+#     origin = request.headers.get('Origin')
     
-    # 如果Origin在允许列表中，设置CORS头部
-    if origin in origins or '*' in origins:
-        response.headers.add('Access-Control-Allow-Origin', origin)
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        response.headers.add('Access-Control-Max-Age', '3600')
+#     # 如果Origin在允许列表中，设置CORS头部
+#     if origin in origins or '*' in origins:
+#         response.headers.add('Access-Control-Allow-Origin', origin)
+#         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+#         response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+#         response.headers.add('Access-Control-Allow-Credentials', 'true')
+#         response.headers.add('Access-Control-Max-Age', '3600')
     
-    return response
+#     return response
 
 # 从环境变量获取Cognito配置
 COGNITO_REGION = os.environ.get('COGNITO_REGION', 'ap-southeast-2')
